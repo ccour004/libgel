@@ -1,0 +1,10 @@
+android/dependencies
+android/app
+android/settings.gradle
+android/.gradle
+CMakeCache.txt
+CMakeFiles/
+Core
+Makefile
+cmake_install.cmake
+build

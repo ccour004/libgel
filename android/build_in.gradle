@@ -1,0 +1,45 @@
+apply plugin: 'com.android.application'
+
+android {
+    compileSdkVersion ${ANDROID_COMPILE_SDK}
+    buildToolsVersion "${ANDROID_BUILD_TOOLS}"
+    defaultConfig {
+        applicationId "${ANDROID_APPLICATION_ID}"
+        minSdkVersion ${ANDROID_MIN_SDK}
+        targetSdkVersion ${ANDROID_TARGET_SDK}
+        versionCode 1
+        versionName "1.0"
+        testInstrumentationRunner "android.support.test.runner.AndroidJUnitRunner"
+        externalNativeBuild {
+            cmake {
+                arguments "-DANDROID_STL=${CMAKE_ANDROID_STL_TYPE}",
+                        "-DANDROID_TOOLCHAIN=${CMAKE_ANDROID_NDK_TOOLCHAIN_VERSION}",
+                        "-DANDROID_CPP_FEATURES=rtti exceptions"
+            }
+        }
+        ndk {
+	    abiFilters '${ANDROID_ABI}'
+        }
+    }
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+        }
+    }
+    externalNativeBuild {
+        cmake {
+            path "../../CMakeLists.txt"
+        }
+    }
+    sourceSets { main { jni.srcDirs = ['${LIBS}', '${LIBS}/'] } }
+}
+
+dependencies {
+    compile fileTree(dir: 'libs', include: ['*.jar'])
+    androidTestCompile('com.android.support.test.espresso:espresso-core:2.2.2', {
+        exclude group: 'com.android.support', module: 'support-annotations'
+    })
+    compile 'com.android.support:appcompat-v7:25.3.1'
+    testCompile 'junit:junit:4.12'
+}
