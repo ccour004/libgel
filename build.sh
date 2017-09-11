@@ -1,8 +1,7 @@
 #!/bin/bash
 
 #Desktop
-mkdir build
-cd build && ln -s ../assets assets 
+mkdir build && cd build
 cmake ..
 make
 ./Core &> /dev/null

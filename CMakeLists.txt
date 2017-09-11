@@ -15,7 +15,6 @@ set(JNI ${DEP}/jni)
 set(DEP_LIST SDL2;SDL2_image;Bullet;entityx)
 
 set(ANDROID_APP_NAME libgel_test)
-set(ANDROID_LIBRARIES SDL2","SDL2_image","entityx","Bullet","main)
 set(ANDROID_COMPILE_SDK 26)
 set(ANDROID_BUILD_TOOLS 25.0.3)
 set(ANDROID_APPLICATION_MK ${DEP}/jni/Application.mk)
@@ -36,7 +35,7 @@ if(${CMAKE_SYSTEM_NAME} MATCHES "Android")
 
 	#Copy shared object libraries into the app's build chain (these aren't auto-copied by cmake for some reason???).
 	file(MAKE_DIRECTORY ${ANDROID_DIR}/app/build/intermediates/cmake/debug/obj)
-	execute_process(COMMAND cp -a ${LIBS}/. ${ANDROID_DIR}/app/build/intermediates/cmake/debug/obj)
+	file(COPY ${LIBS}/. DESTINATION ${ANDROID_DIR}/app/build/intermediates/cmake/debug/obj)
 
 	#GLM
 	include_directories(${JNI}/GLM/src/GLM_DL)
@@ -66,9 +65,16 @@ if(${CMAKE_SYSTEM_NAME} MATCHES "Android")
 
 	#Install Android app and launch.
 	execute_process(COMMAND adb shell am start -n org.libsdl.app/org.libsdl.app.SDLActivity)
-
 else()
         message(STATUS "ANDROID DEV CONFIGURE...")
+
+	#Buid up the Android dependency string.
+	set(ANDROID_LIBRARIES "")
+	foreach(DEPENDENCY ${DEP_LIST})
+		set(ANDROID_LIBRARIES ${ANDROID_LIBRARIES}${DEPENDENCY}",")
+	endforeach()
+	set(ANDROID_LIBRARIES ${ANDROID_LIBRARIES}main)
+
 	#Build the Android app directories.
 	file(MAKE_DIRECTORY ${ANDROID_DIR}/app/src/main/java/org/libsdl/app)
 	file(MAKE_DIRECTORY ${ANDROID_DIR}/app/src/main/assets)
@@ -77,8 +83,13 @@ else()
 	file(COPY ${ANDROID_DIR}/jni DESTINATION ${ANDROID_DIR}/dependencies)
 
 	#Symlinks, or deep-copy directories if host is non-UNIX.
-	execute_process(COMMAND "${CMAKE_COMMAND}" -E create_symlink ${HOME_DIR}/assets ${ANDROID_DIR}/app/src/main/assets/assets)
-	execute_process(COMMAND "${CMAKE_COMMAND}" -E create_symlink ${HOME_DIR}/core ${ANDROID_DIR}/app/src/main/cpp/core)
+	if(UNIX)
+		execute_process(COMMAND "${CMAKE_COMMAND}" -E create_symlink ${HOME_DIR}/assets ${ANDROID_DIR}/app/src/main/assets/assets)
+		execute_process(COMMAND "${CMAKE_COMMAND}" -E create_symlink ${HOME_DIR}/core ${ANDROID_DIR}/app/src/main/cpp/core)
+	else()
+		file(COPY ${HOME_DIR}/assets DESTINATION ${ANDROID_DIR}/app/src/main/assets/assets)
+		file(COPY ${HOME_DIR}/core DESTINATION ${ANDROID_DIR}/app/src/main/cpp/core)
+	endif()
 
 	#Edit configuration files.
 	configure_file(${ANDROID_DIR}/proguard-rules_in.pro ${ANDROID_DIR}/app/proguard-rules.pro)
@@ -97,6 +108,13 @@ else()
 	file(APPEND ${ANDROID_APPLICATION_MK} "APP_ABI := ${ANDROID_ABI}\n")	
 
         message(STATUS "BUILDING FOR DESKTOP...")
+
+	#Symlinks, or deep-copy directories if host is non-UNIX.
+	if(UNIX)
+		execute_process(COMMAND "${CMAKE_COMMAND}" -E create_symlink ${HOME_DIR}/assets ${HOME_DIR}/build/assets)
+	else()
+		file(COPY ${HOME_DIR}/assets DESTINATION ${HOME_DIR}/build/assets)
+	endif()
 
 	#OPENGL (GL and GLU)
 	find_package(OpenGL)
@@ -145,8 +163,6 @@ else()
 		add_dependencies(SDL2 SDL2_DL)
 		set_target_properties(SDL2 PROPERTIES IMPORTED_LOCATION ${binary_dir}/libSDL2-2.0.so)
 	#endif()
-	execute_process(COMMAND "${CMAKE_COMMAND}" -E create_symlink ${HOME_DIR}/SDL2 ${JNI}/SDL2/src/SDL2_DL/src)
-
 
 	#SDL2_image
 	#if(FORCE_SYSTEM_LIBRARIES)
