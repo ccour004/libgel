@@ -75,7 +75,7 @@ namespace gel
                 offset += sizeof(descriptors[i].type) * descriptors[i].size;
             }
         }
-        ~VertexBufferObject(){SDL_Log("VBO DESTRUCT!");/*glDeleteBuffers(descriptors.size(),&vbo_handle);*/}
+        ~VertexBufferObject(){/*SDL_Log("VBO DESTRUCT!");*//*glDeleteBuffers(descriptors.size(),&vbo_handle);*/}
     };
 
     struct IndexBufferObject{
@@ -96,7 +96,7 @@ namespace gel
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,ibo_handle);
         glBufferData(GL_ELEMENT_ARRAY_BUFFER, data.size() * sizeof(GLuint), data.data(), GL_STATIC_DRAW);
     }
-    ~IndexBufferObject(){SDL_Log("IBO DESTRUCT!");/*glDeleteBuffers(1,&ibo_handle);*/}
+    ~IndexBufferObject(){/*SDL_Log("IBO DESTRUCT!");*//*glDeleteBuffers(1,&ibo_handle);*/}
     };
 
     class Vertices
@@ -140,7 +140,7 @@ namespace gel
         }
         
         ~Vertices(){
-            SDL_Log("VAO DESTRUCT!");
+            //SDL_Log("VAO DESTRUCT!");
             //glDeleteVertexArrays(1,&vao);
         }
     };

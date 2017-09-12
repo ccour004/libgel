@@ -95,11 +95,14 @@ namespace gel
 
             for (int iv = 0; iv <= divisionsV; iv++) {
                 angleV = avo + stepV * iv;
+                v = vs * iv;
                 float t = sin(angleV);
                 float h = cos(angleV) * hh;
                 for (int iu = 0; iu <= divisionsU; iu++) {
                     angleU = auo + stepU * iu;
+                    u = 1.0f - us * iu;
                     vertices.push_back(glm::vec3(cos(angleU) * hw * t, h, sin(angleU) * hd * t));
+                    vertices.push_back(glm::vec3(u,v,0));
                     tmpIndices[tempOffset] = vertices.size() - 1;
                     int o = tempOffset + s;
                     if ((iv > 0) && (iu > 0))
@@ -115,10 +118,15 @@ namespace gel
                 }
             }
             
-            for(glm::vec3 vertex:vertices){
-                vertexValues.push_back(vertex.x);
+            for(/*glm::vec3 vertex:vertices*/int i = 0;i < vertices.size();i+=2){
+                /*vertexValues.push_back(vertex.x);
                 vertexValues.push_back(vertex.y);
-                vertexValues.push_back(vertex.z);
+                vertexValues.push_back(vertex.z);*/
+                vertexValues.push_back(vertices[i].x);
+                vertexValues.push_back(vertices[i].y);
+                vertexValues.push_back(vertices[i].z);
+                vertexValues.push_back(vertices[i+1].x);
+                vertexValues.push_back(vertices[i+1].y);
             }
         }
         ~ShapeBuilder();

@@ -1,3 +1,25 @@
+/*MIT License
+
+Copyright (c) 2017 Colin Courtney
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.*/
+
 #pragma once
 
 #include <entityx/entityx.h>
@@ -13,6 +35,7 @@
 
 #include "system/RenderSystem.hpp"
 #include "system/PhysicsSystem.hpp"
+#include "system/ResourceSystem.hpp"
 
 class MyRawInputProcessor: public gel::RawInputProcessor{
 public:
@@ -110,6 +133,7 @@ public:
     //Entityx configuration.
     systems.add<PhysicsSystem>();
     systems.add<RenderSystem>();
+    systems.add<ResourceSystem>();
     systems.configure();
     
     //Setup gl settings.
@@ -131,8 +155,10 @@ public:
     gel::ShapeBuilder::buildSphere(vertices,indices,2,2,2,20,20);
     
     vertData.push_back(gel::Vertices(
-        std::vector<gel::VertexDescriptor>{gel::VertexDescriptor(GL_FLOAT,3,
-        shaders[1].getAttribute("a_position"))},vertices,indices));
+        std::vector<gel::VertexDescriptor>{
+            gel::VertexDescriptor(GL_FLOAT,3,shaders[2].getAttribute("a_position")),
+            gel::VertexDescriptor(GL_FLOAT,2,shaders[2].getAttribute("a_texCoord0"))
+        },vertices,indices));
     
     //Create ground.
     entityx::Entity ground;
@@ -169,12 +195,15 @@ public:
     entityx::Entity temp;
     sstream>>count;
     btSphereShape* sphere = new btSphereShape(1.0f);
+    entityx::Entity texture = entities.create();
+    texture.assign<gel::Resource>(gel::Resource(new gel::Texture("assets/test.jpg")));
 
     while(!sstream.eof()){
         sstream>>x>>y>>z;
         temp = entities.create();
         temp.assign<gel::Vertices>(vertData[0]);
-        temp.assign<gel::Shader>(shaders[1]);
+        temp.assign<gel::Shader>(shaders[2]);
+        temp.assign<entityx::Entity>(texture);
         temp.assign<glm::vec3>(glm::vec3(x,y,z));
         temp.assign<glm::vec4>(glm::vec4(((float) rand()) / (float) RAND_MAX,((float) rand()) / (float) RAND_MAX,((float) rand()) / (float) RAND_MAX,1.0f));
         temp.assign<RigidBody>(RigidBody(std::string("test"),10.0f,btVector3(x,y,z),sphere));
@@ -190,6 +219,7 @@ public:
     std::chrono::duration<double> delta = now - lastTime;lastTime = now;
     entityx::TimeDelta dt = std::chrono::duration_cast<std::chrono::milliseconds>(delta).count() * 0.001f;
 
+    systems.update<ResourceSystem>(dt);
     systems.update<PhysicsSystem>(dt);
     systems.update<RenderSystem>(dt);
  }
