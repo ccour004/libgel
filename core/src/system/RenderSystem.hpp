@@ -25,10 +25,10 @@ SOFTWARE.*/
 #include <entityx/entityx.h>
 #include "../Common.hpp"
 #include "../Camera.hpp"
-#include "../Vertices.hpp"
-#include "../Shader.hpp"
-#include "ResourceSystem.hpp"
+#include "ShaderSystem.hpp"
+#include "TextureSystem.hpp"
 #include "PhysicsSystem.hpp"
+#include "VertexSystem.hpp"
 #include <glm/gtx/rotate_vector.hpp>
 
 class RenderSystem: public entityx::System<RenderSystem>{
@@ -38,46 +38,56 @@ public:
     static float rotateAmount,rotateSpeed;
     static bool drag;
     static glm::vec3 eye;
+    static btTransform trans;
 
     RenderSystem(){
-        cam = gel::Camera(glm::radians(90.0f),640.0f/480.0f,0.1f,100.0f);
+        cam = gel::Camera(glm::radians(90.0f),640.0f,480.0f,0.1f,100.0f);
         cam.lookAt(eye,glm::vec3(0,0,0),glm::vec3(0,1,0));
     }
     void update(entityx::EntityManager& entities,entityx::EventManager& events,entityx::TimeDelta dt) override{
+        std::chrono::time_point<std::chrono::system_clock> now = std::chrono::system_clock::now();
+
+        glViewport(0,0,cam.width,cam.height);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
         eye = glm::rotateY(eye,(float)(dt * rotateAmount * rotateSpeed));
         cam.lookAt(eye,glm::vec3(0,0,0),glm::vec3(0,1,0));
-        entities.each<gel::Vertices,gel::Shader,glm::vec3,glm::vec4>
-            ([](entityx::Entity entity, gel::Vertices& vertices,gel::Shader& shader,glm::vec3& pos,glm::vec4& color) {
-            shader.begin();
-            glm::mat4 model = glm::translate(glm::mat4(1.0f),pos);
-
+        entities.each<gel::ShaderHandle,gel::VertexHandle,glm::vec3,glm::vec4,glm::mat4>([](entityx::Entity entity,
+            gel::ShaderHandle& shaderHandle,gel::VertexHandle& vertexHandle,glm::vec3& pos,glm::vec4& color,glm::mat4& model) {
             entityx::ComponentHandle<RigidBody> body = entity.component<RigidBody>();
-            entityx::ComponentHandle<entityx::Entity> textureHandle = entity.component<entityx::Entity>();
-
-            if(body){
-                btTransform trans;
-                if (body->body && body->body->getMotionState()){
-                    body->body->getMotionState()->getWorldTransform(trans);
-               // else trans = body->body->getWorldTransform();
+            entityx::ComponentHandle<gel::ShaderProgram> shader = shaderHandle.ent.component<gel::ShaderProgram>();
+            entityx::ComponentHandle<gel::VertexReference> vertex = vertexHandle.ent.component<gel::VertexReference>();
+            entityx::ComponentHandle<gel::TextureHandle> textureHandle = entity.component<gel::TextureHandle>();
+   
+            if(body->mass == 0.0f) model = glm::translate(glm::mat4(1.0f),pos);
+            else{
+                body->motionState->getWorldTransform(trans);
                 model = glm::translate(glm::mat4(1.0f),glm::vec3(float(trans.getOrigin().getX()),
-                    float(trans.getOrigin().getY()), float(trans.getOrigin().getZ())));}
+                    float(trans.getOrigin().getY()), float(trans.getOrigin().getZ())));
             }
 
-            shader.setAttribute("a_color",std::vector<GLfloat>{color.r,color.g,color.b,color.a});
-            shader.setUniform("u_projView",cam.getCombined() * model,false);
-            if(textureHandle) {
-                entityx::ComponentHandle<gel::Resource> resource = (*textureHandle.get()).component<gel::Resource>();
-                glBindTexture(GL_TEXTURE_2D,((gel::Texture*)resource->type)->tex);
+            if(shader){
+                shader->begin();
+                shader->setAttribute("a_color",std::vector<GLfloat>{color.r,color.g,color.b,color.a});
+                shader->setUniform("u_projView",cam.getCombined() * model,false);
             }
-            vertices.draw(GL_TRIANGLES);
-            shader.end();
+
+            if(textureHandle){
+                entityx::ComponentHandle<gel::TextureReference> texture = (*textureHandle.get()).ent.component<gel::TextureReference>();
+                if(texture) glBindTexture(GL_TEXTURE_2D,texture->tex);
+            } 
+            if(vertex) vertex->draw(GL_TRIANGLES);
+            if(shader) shader->end();
          });
+
+         SDL_Log("RENDER TIME: %f",(float)std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now() - now).count());
     }
 };
 
 gel::Camera RenderSystem::cam;
 int RenderSystem::x = 30;
 float RenderSystem::rotateAmount = 0.0f;
-float RenderSystem::rotateSpeed = 0.05f;
+float RenderSystem::rotateSpeed = 0.05f * 0.001f;
 bool RenderSystem::drag = false;
+btTransform RenderSystem::trans;
 glm::vec3 RenderSystem::eye = ((float)glm::clamp(RenderSystem::x,1,72)) * glm::normalize(glm::vec3(50,10,50));

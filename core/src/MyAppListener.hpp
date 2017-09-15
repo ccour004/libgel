@@ -22,20 +22,11 @@ SOFTWARE.*/
 
 #pragma once
 
-#include <entityx/entityx.h>
-#include <Application.hpp>
-#include <chrono>
-#include <memory>
+#include <DefaultAppListener.hpp>
 
 #include "Camera.hpp"
-#include "Vertices.hpp"
-#include "Shader.hpp"
 #include "Input.hpp"
 #include "ShapeBuilder.hpp"
-
-#include "system/RenderSystem.hpp"
-#include "system/PhysicsSystem.hpp"
-#include "system/ResourceSystem.hpp"
 
 class MyRawInputProcessor: public gel::RawInputProcessor{
 public:
@@ -115,26 +106,15 @@ public:
     }  
 };
 
-class MyAppListener: public gel::ApplicationListener,entityx::EntityX{
+class MyAppListener: public gel::DefaultAppListener{
     bool isCreated = false;
     static bool isPaused;
-    int counter = 0;
-    
-    //Camera
-    float near = 0.1f,far = 100.0f,fov = 67.0f;
-    float width = 640,height = 480;
     
     //Resources
-    std::vector<gel::Vertices> vertData;
-    std::vector<gel::Shader> shaders;
-    std::chrono::time_point<std::chrono::system_clock> lastTime;
+    btSphereShape* sphere;
 public:
  bool create(){
-    //Entityx configuration.
-    systems.add<PhysicsSystem>();
-    systems.add<RenderSystem>();
-    systems.add<ResourceSystem>();
-    systems.configure();
+    DefaultAppListener::create();
     
     //Setup gl settings.
     glEnable(GL_DEPTH_TEST);
@@ -146,18 +126,30 @@ public:
     setRawInputProcessor(std::make_shared<MyRawInputProcessor>());
         
     //Setup shader program.
-    shaders.push_back(gel::Shader("assets/default","#version 300 es\n"));
-    shaders.push_back(gel::Shader("assets/alt","#version 300 es\n"));
-    shaders.push_back(gel::Shader("assets/texTest","#version 300 es\n"));
+    std::string prepend = "#version 300 es\n";
+    entityx::Entity defaultShader = newEntity(),altShader = newEntity(),texShader = newEntity();
+    defaultShader.assign<gel::ShaderSpec>(gel::ShaderSpec("default",std::vector<gel::ShaderSource>{
+        gel::ShaderSource("assets/default.vert",GL_VERTEX_SHADER,prepend),
+        gel::ShaderSource("assets/default.frag",GL_FRAGMENT_SHADER,prepend)
+    }));
+    altShader.assign<gel::ShaderSpec>(gel::ShaderSpec("alt",std::vector<gel::ShaderSource>{
+        gel::ShaderSource("assets/alt.vert",GL_VERTEX_SHADER,prepend),
+        gel::ShaderSource("assets/alt.frag",GL_FRAGMENT_SHADER,prepend)
+    }));
+    texShader.assign<gel::ShaderSpec>(gel::ShaderSpec("tex",std::vector<gel::ShaderSource>{
+        gel::ShaderSource("assets/texTest.vert",GL_VERTEX_SHADER,prepend),
+        gel::ShaderSource("assets/texTest.frag",GL_FRAGMENT_SHADER,prepend)
+    }));
     
     std::vector<GLfloat> vertices = std::vector<GLfloat>();
     std::vector<GLuint> indices = std::vector<GLuint>();
     gel::ShapeBuilder::buildSphere(vertices,indices,2,2,2,20,20);
-    
-    vertData.push_back(gel::Vertices(
-        std::vector<gel::VertexDescriptor>{
-            gel::VertexDescriptor(GL_FLOAT,3,shaders[2].getAttribute("a_position")),
-            gel::VertexDescriptor(GL_FLOAT,2,shaders[2].getAttribute("a_texCoord0"))
+    entityx::Entity sphereVertex = newEntity(),groundVertex;
+    sphereVertex.assign<gel::ShaderHandle>(gel::ShaderHandle(texShader));
+    sphereVertex.assign<gel::Vertex>(gel::Vertex(
+        std::vector<gel::VertexSpec>{
+            gel::VertexSpec(GL_FLOAT,3,"a_position"),
+            gel::VertexSpec(GL_FLOAT,2,"a_texCoord0")
         },vertices,indices));
     
     //Create ground.
@@ -176,15 +168,24 @@ public:
     };
 
     for(std::vector<float> obstruction:obstructions){
-        ground = entities.create();
+        //Build vertex.
         std::vector<GLfloat> tempvertices = std::vector<GLfloat>();
         std::vector<GLuint> tempindices = std::vector<GLuint>();
         gel::ShapeBuilder::buildBox(tempvertices,tempindices,obstruction[3],obstruction[4],obstruction[5]);
-        ground.assign<gel::Vertices>(gel::Vertices(std::vector<gel::VertexDescriptor>{gel::VertexDescriptor(GL_FLOAT,3,
-            shaders[1].getAttribute("a_position"))},tempvertices,tempindices));
-        ground.assign<gel::Shader>(shaders[1]);
+        groundVertex = newEntity();
+        groundVertex.assign<gel::ShaderHandle>(gel::ShaderHandle(altShader));
+        groundVertex.assign<gel::Vertex>(gel::Vertex(
+            std::vector<gel::VertexSpec>{
+                gel::VertexSpec(GL_FLOAT,3,"a_position")
+            },tempvertices,tempindices));
+        
+        //Build ground entity.
+        ground = newEntity();
+        ground.assign<gel::ShaderHandle>(gel::ShaderHandle(altShader));
+        ground.assign<gel::VertexHandle>(gel::VertexHandle(groundVertex));
+        ground.assign<glm::mat4>(glm::mat4());
         ground.assign<glm::vec3>(glm::vec3(obstruction[0],obstruction[1],obstruction[2]));
-        ground.assign<glm::vec4>(glm::vec4(((float) rand()) / (float) RAND_MAX/*1.0f*/,((float) rand()) / (float) RAND_MAX/*1.0f*/,((float) rand()) / (float) RAND_MAX/*1.0f*/,1.0f));
+        ground.assign<glm::vec4>(glm::vec4(((float) rand()) / (float) RAND_MAX,((float) rand()) / (float) RAND_MAX,((float) rand()) / (float) RAND_MAX,1.0f));
         ground.assign<RigidBody>(RigidBody(std::string("test"),0.0f,btVector3(obstruction[0],obstruction[1],obstruction[2]),
             new btBoxShape(btVector3(obstruction[3] / 2.0f,obstruction[4] / 2.0f,obstruction[5] / 2.0f))));
     }
@@ -194,16 +195,17 @@ public:
     float x,y,z;
     entityx::Entity temp;
     sstream>>count;
-    btSphereShape* sphere = new btSphereShape(1.0f);
-    entityx::Entity texture = entities.create();
-    texture.assign<gel::Resource>(gel::Resource(new gel::Texture("assets/test.jpg")));
+    sphere = new btSphereShape(1.0f);
+    entityx::Entity texture = newEntity();
+    texture.assign<gel::Texture>(gel::Texture("assets/test.jpg"));
 
     while(!sstream.eof()){
         sstream>>x>>y>>z;
-        temp = entities.create();
-        temp.assign<gel::Vertices>(vertData[0]);
-        temp.assign<gel::Shader>(shaders[2]);
-        temp.assign<entityx::Entity>(texture);
+        temp = newEntity();
+        temp.assign<gel::ShaderHandle>(gel::ShaderHandle(texShader));
+        temp.assign<gel::VertexHandle>(gel::VertexHandle(sphereVertex));
+        temp.assign<gel::TextureHandle>(gel::TextureHandle(texture));
+        temp.assign<glm::mat4>(glm::mat4());
         temp.assign<glm::vec3>(glm::vec3(x,y,z));
         temp.assign<glm::vec4>(glm::vec4(((float) rand()) / (float) RAND_MAX,((float) rand()) / (float) RAND_MAX,((float) rand()) / (float) RAND_MAX,1.0f));
         temp.assign<RigidBody>(RigidBody(std::string("test"),10.0f,btVector3(x,y,z),sphere));
@@ -211,25 +213,13 @@ public:
     return true;
  }
 
- void render(){
-    glViewport(0,0,width,height);
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    
-    std::chrono::time_point<std::chrono::system_clock> now = std::chrono::system_clock::now();
-    std::chrono::duration<double> delta = now - lastTime;lastTime = now;
-    entityx::TimeDelta dt = std::chrono::duration_cast<std::chrono::milliseconds>(delta).count() * 0.001f;
-
-    systems.update<ResourceSystem>(dt);
-    systems.update<PhysicsSystem>(dt);
-    systems.update<RenderSystem>(dt);
- }
-
  void resize(int width, int height){
-    this->width = (float)width;this->height = (float)height;
-    RenderSystem::cam.setAspect(this->width/this->height);
+    RenderSystem::cam.setAspect((float)width,(float)height);
  }
 
  void pause(){}
  void resume(){}
- void dispose(){}
+ void dispose(){
+     DefaultAppListener::dispose();delete sphere;
+ }
 };

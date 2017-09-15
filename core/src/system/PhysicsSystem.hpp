@@ -47,6 +47,7 @@ struct RigidBody{
     btScalar mass;
     btVector3 origin;
     btRigidBody* body;
+    btDefaultMotionState* motionState;
     std::string name;
 };
 
@@ -95,7 +96,8 @@ public:
         if (isDynamic) rb->shape->calculateLocalInertia(rb->mass, localInertia);
 
         //Set motion state for carrying out the simulation.
-        btRigidBody::btRigidBodyConstructionInfo rbInfo(rb->mass, new btDefaultMotionState(transform), rb->shape,
+        rb->motionState = new btDefaultMotionState(transform);
+        btRigidBody::btRigidBodyConstructionInfo rbInfo(rb->mass, rb->motionState, rb->shape,
                                                             localInertia);
         //Add the rigid body to the scene.
         rb->body = new btRigidBody(rbInfo);
@@ -112,7 +114,7 @@ public:
         }
 
         //Delete collision shapes
-        for(btCollisionShape* shape:shapes) delete shape;
+        //for(btCollisionShape* shape:shapes) delete shape;
 
         delete world;
         delete solver;
@@ -121,6 +123,10 @@ public:
         delete broadphase;
     }
     void update(entityx::EntityManager& entities,entityx::EventManager& events,entityx::TimeDelta dt) override{
-        world->stepSimulation(std::min(1.0/30.0,(double)dt),MAX_SUB_STEPS,FIXED_TIME_STEP);
+        std::chrono::time_point<std::chrono::system_clock> now = std::chrono::system_clock::now();
+
+        world->stepSimulation(std::min(1.0f/30.0f,(float)dt),MAX_SUB_STEPS,FIXED_TIME_STEP);/*->stepSimulation( 1.0f / 60.0f, 0 );*/
+
+        SDL_Log("PHYSICS TIME: %f",(float)std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now() - now).count());
     }
 };

@@ -33,17 +33,14 @@ namespace gel
     class Camera
     {
         glm::mat4 projection,view;
-        float fovY,aspect,near,far;
     public:
+        float fovY,aspect,near,far,width,height;
+
         Camera(){}
-        Camera(float fovY,float aspect,float near,float far){
-            this->fovY = fovY;
-            this->aspect = aspect;
-            this->near = near;
-            this->far = far;
-            view = glm::mat4(1.0f);
-            projection = glm::perspective(fovY,aspect,near,far);
-        }
+        Camera(float fovY,float width,float height,float near,float far):
+            fovY(fovY),width(width),height(height),aspect(width/height),near(near),far(far),view(glm::mat4(1.0f)){
+                projection = glm::perspective(fovY,aspect,near,far);
+            }
         ~Camera(){};
         
         void lookAt(glm::vec3 eye,glm::vec3 center,glm::vec3 up){
@@ -66,8 +63,9 @@ namespace gel
             translate(point);
         }
         
-        void setAspect(float aspect){
-            this->aspect = aspect;
+        void setAspect(float width,float height){
+            this->width = width;this->height = height;
+            aspect = width / height;
             projection = glm::perspective(fovY,aspect,near,far);
         }
         

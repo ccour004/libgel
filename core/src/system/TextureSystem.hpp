@@ -24,31 +24,35 @@ SOFTWARE.*/
 
 #include <entityx/entityx.h>
 
-namespace gel
-{
-    struct ResourceType{
-        std::string filename;
-        bool isLoaded = false;
-        virtual void load() = 0;
+namespace gel{
+    struct TextureHandle{
+        entityx::Entity ent;
+       TextureHandle(entityx::Entity& ent):ent(ent){}
     };
-
-    struct Resource{
-        ResourceType* type;
-        Resource(ResourceType* type):type(type){}
-        void load(){if(!type->isLoaded) type->load();}
+    struct Texture{
+        std::string filename; 
+        Texture(std::string filename):filename(filename){}     
     };
-
-    struct Texture:public ResourceType{
-        SDL_Surface* image;
+    struct TextureReference{
         GLuint tex;
-        Texture(std::string filename){this->filename = filename;}
-        ~Texture(){delete image;}
-        void load() override{
-            image = IMG_Load(filename.c_str());
+    };
+}
+
+class TextureSystem: public entityx::System<TextureSystem>,public entityx::Receiver<TextureSystem>{
+public:
+    void configure(entityx::EventManager& events) override{
+        events.subscribe<entityx::ComponentRemovedEvent<gel::TextureReference>>(*this);
+    }
+    void update(entityx::EntityManager& entities,entityx::EventManager& events,entityx::TimeDelta dt) override{
+        entities.each<gel::Texture>([](entityx::Entity entity,gel::Texture& texture) {
+            gel::TextureReference ref;
+            SDL_Surface* image;
+            image = IMG_Load(texture.filename.c_str());
             if(!image)
                 SDL_Log("IMG_Load: %s\n",IMG_GetError());
                 
-            glEnable (GL_BLEND); glBlendFunc (GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+            glEnable (GL_BLEND); 
+            glBlendFunc (GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
             
             int format = GL_RGB;
             switch(image->format->BytesPerPixel){
@@ -56,10 +60,11 @@ namespace gel
                 case 4: format = GL_RGBA; break;
             }
             
-            SDL_Log("FORMAT: %i (%i,%i,%i,%i)",image->format->BytesPerPixel,image->format->Rmask,image->format->Gmask,image->format->Bmask,image->format->Amask);
+            SDL_Log("FORMAT: %i (%i,%i,%i,%i)",image->format->BytesPerPixel,image->format->Rmask,image->format->Gmask,
+                image->format->Bmask,image->format->Amask);
                 
-            glGenTextures(1, &tex);
-            glBindTexture(GL_TEXTURE_2D, tex);
+            glGenTextures(1, &ref.tex);
+            glBindTexture(GL_TEXTURE_2D,ref.tex);
             
             glTexImage2D(GL_TEXTURE_2D, 0, format, image->w, image->h, 0, format, GL_UNSIGNED_BYTE, image->pixels);
             
@@ -68,17 +73,13 @@ namespace gel
             
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    
-            isLoaded = true;
-        }
-    };
-}
 
-class ResourceSystem: public entityx::System<ResourceSystem>{
-public:
-    void update(entityx::EntityManager& entities,entityx::EventManager& events,entityx::TimeDelta dt) override{
-        entities.each<gel::Resource>([](entityx::Entity entity, gel::Resource& resource) {
-           resource.load();
+            SDL_FreeSurface(image);
+            entity.component<gel::Texture>().remove();
+            entity.assign<gel::TextureReference>(ref);
         });
+    }
+    void receive(const entityx::ComponentRemovedEvent<gel::TextureReference>& event){
+        SDL_Log("Removing texture...");
     }
 };
