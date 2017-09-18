@@ -33,10 +33,27 @@ SOFTWARE.*/
 #include "system/ShaderSystem.hpp"
 #include "system/VertexSystem.hpp"
 
+#include <thread>
+
 namespace gel{
     class DefaultAppListener: public gel::ApplicationListener,entityx::EntityX{
-        std::chrono::time_point<std::chrono::system_clock> lastTime;
+        std::chrono::time_point<std::chrono::system_clock> now,lastTime;
+        std::chrono::duration<double> delta;
     public:
+        static bool quitFlag,threadFlag;
+        static /*void*/int PhysicsThread(/*entityx::SystemManager**/void* /*systems_ptr*/systems_ptr_v){
+            /**/entityx::SystemManager* systems_ptr = (entityx::SystemManager*)systems_ptr_v;/**/
+            std::chrono::time_point<std::chrono::system_clock> thread_now,thread_lastTime;
+            std::chrono::duration<double> thread_delta;
+
+            while(!quitFlag){
+                thread_now = std::chrono::system_clock::now();
+                thread_delta = thread_now - thread_lastTime;thread_lastTime = thread_now;
+                systems_ptr->update<PhysicsSystem>(std::chrono::duration_cast<std::chrono::milliseconds>(thread_delta).count());
+                std::this_thread::sleep_for(std::chrono::milliseconds(1));
+            }
+            return 0;
+        }
         bool create(){
             //Entityx configuration.
             systems.add<PhysicsSystem>();
@@ -44,26 +61,35 @@ namespace gel{
             systems.add<TextureSystem>();
             systems.add<ShaderSystem>();
             systems.add<VertexSystem>();
-            systems.configure();          
+            systems.configure(); 
             return true;
         }
 
-        void render(){        
-            std::chrono::time_point<std::chrono::system_clock> now = std::chrono::system_clock::now();
-            std::chrono::duration<double> delta = now - lastTime;lastTime = now;
+        void render(){   
+            if(!threadFlag){
+                //Thread configuration.
+                //std::thread(PhysicsThread,&systems).detach();
+                SDL_DetachThread(SDL_CreateThread(PhysicsThread, "PhysicsThread",&systems));
+                threadFlag = true;
+            }     
+            now = std::chrono::system_clock::now();
+            delta = now - lastTime;lastTime = now;
             entityx::TimeDelta dt = std::chrono::duration_cast<std::chrono::milliseconds>(delta).count();
             
             systems.update<TextureSystem>(dt);
             systems.update<VertexSystem>(dt);
             systems.update<ShaderSystem>(dt);
-            systems.update<PhysicsSystem>(dt);
+            //systems.update<PhysicsSystem>(dt);
             systems.update<RenderSystem>(dt);
         }
 
         void dispose(){
+            quitFlag = true;
             entities.reset();
         }
 
         entityx::Entity newEntity(){return entities.create();}
     };
+    bool DefaultAppListener::quitFlag = false;
+    bool DefaultAppListener::threadFlag = false;
 }

@@ -113,6 +113,7 @@ class MyAppListener: public gel::DefaultAppListener{
     //Resources
     btSphereShape* sphere;
 public:
+    MyAppListener(){}
  bool create(){
     DefaultAppListener::create();
     

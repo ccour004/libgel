@@ -128,6 +128,10 @@ else()
 	    include_directories(${GLEW_INCLUDE_DIRS})
 	endif()
 
+	#PTHREADS
+	#set(THREADS_PREFER_PTHREAD_FLAG ON)
+	#find_package(Threads REQUIRED)
+
 	#GLM
 	#if(FORCE_SYSTEM_LIBRARIES)
 	#	find_package(GLM REQUIRED)
@@ -248,6 +252,10 @@ else()
 	aux_source_directory(core/src/ SOURCE)
 	add_executable(Core ${SOURCE})
 	include_directories(core/src)
+
+        #target_link_libraries(Core Threads::Threads ${OPENGL_LIBRARIES} ${GLEW_LIBRARIES} SDL2 SDL2_image
+	#	linearMath common collision dynamics softBody inverseDynamics
+	#	project_entityx)
 
         target_link_libraries(Core ${OPENGL_LIBRARIES} ${GLEW_LIBRARIES} SDL2 SDL2_image
 		linearMath common collision dynamics softBody inverseDynamics

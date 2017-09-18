@@ -39,6 +39,7 @@ public:
     static bool drag;
     static glm::vec3 eye;
     static btTransform trans;
+    static GLuint lastVAO;
 
     RenderSystem(){
         cam = gel::Camera(glm::radians(90.0f),640.0f,480.0f,0.1f,100.0f);
@@ -76,7 +77,14 @@ public:
                 entityx::ComponentHandle<gel::TextureReference> texture = (*textureHandle.get()).ent.component<gel::TextureReference>();
                 if(texture) glBindTexture(GL_TEXTURE_2D,texture->tex);
             } 
-            if(vertex) vertex->draw(GL_TRIANGLES);
+            if(vertex){
+                if(lastVAO != vertex->vao){
+                    lastVAO = vertex->vao;
+                    glBindVertexArray(vertex->vao);
+                }
+                glDrawElements(GL_TRIANGLES,vertex->ibo_size,GL_UNSIGNED_INT,0);
+                //vertex->draw(GL_TRIANGLES);
+            }
             if(shader) shader->end();
          });
 
@@ -91,3 +99,4 @@ float RenderSystem::rotateSpeed = 0.05f * 0.001f;
 bool RenderSystem::drag = false;
 btTransform RenderSystem::trans;
 glm::vec3 RenderSystem::eye = ((float)glm::clamp(RenderSystem::x,1,72)) * glm::normalize(glm::vec3(50,10,50));
+GLuint RenderSystem::lastVAO = -1;
