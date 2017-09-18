@@ -11,6 +11,11 @@ How to build:
 * Run ./build.sh (note: this is assuming a Unix-based build machine for now - this will change).
 * Run ./clean.sh to clean up your build environment.
 
+Notes:
+------
+* If using GCC/G++ to compile, the version must be at least 4.9.
+* CMake respects the CC/CXX environment varibles in a Linux environment for specifying the compiler (i.e., GCC vs Clang).
+
 Supported platforms:
 --------------------
 * Desktop (Linux, Windows, and Mac OS)
