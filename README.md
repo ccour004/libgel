@@ -36,7 +36,7 @@ Project dependencies:
 ---------------------
 * SDL2 (low-level windowing, input, threads, audio)
 * SDL2_image (texture loading)
-* SDL_ttf (text/font loading)
+* SDL2_ttf (text/font loading)
 * OpenGL (graphics processing)
 * GLEW (graphics extension 'wrangling' for desktop only)
 * glm (linear algebra)
