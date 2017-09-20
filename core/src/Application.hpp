@@ -23,6 +23,7 @@ SOFTWARE.*/
 #pragma once
 
 #include <SDL.h>
+#include <SDL_ttf.h>
 #include "Common.hpp"
 #include "Input.hpp"
 
@@ -132,6 +133,12 @@ namespace gel
                 //Initialization flag
                 SDL_Log("++INITIALIZE SDL++");
                 SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMECONTROLLER | SDL_INIT_AUDIO);
+
+                SDL_Log("++INITIALIZE SDL_TTF++");
+                if(TTF_Init() == -1){
+                    SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,"Error initializing SDL_TTF! \n");
+                    return;
+                }
         
                 SDL_Log("++SET OPENGL ATTRIBUTES++");
                 setAttributes(desktop,mobile);
@@ -165,17 +172,17 @@ namespace gel
                 while(!quit){
                     while(SDL_PollEvent(&e) != 0){
                         //System events first.
-                        if(e.type == SDL_QUIT){quit = true; continue;}
+                        if(e.type == SDL_QUIT){quit = true;SDL_Log("!!!SDL_QUIT!!!"); continue;}
                         switch(e.type){
-                            case SDL_APP_TERMINATING:
-                            case SDL_APP_LOWMEMORY:
+                            case SDL_APP_TERMINATING:SDL_Log("!!!SDL_APP_TERMINATING!!!");
+                            case SDL_APP_LOWMEMORY:SDL_Log("!!!SDL_APP_LOWMEMORY!!!");
                                 quit = true;
                                 continue;
                             case SDL_WINDOWEVENT:
                                 if (e.window.windowID == SDL_GetWindowID(window)) {
                                     switch (e.window.event) {
                                         case SDL_WINDOWEVENT_CLOSE:
-                                            quit = true;
+                                            quit = true;SDL_Log("!!!SDL_WINDOWEVENT_CLOSE!!!");
                                             continue;
                                         case SDL_WINDOWEVENT_SIZE_CHANGED:
                                             listener->resize(e.window.data1,e.window.data2);

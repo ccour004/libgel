@@ -37,15 +37,15 @@ namespace gel
             //POS
             vertices = std::vector<GLfloat>{
                 // front
-                -0.5f * width, -0.5f * height,  0.5f * depth,
-                0.5f * width, -0.5f * height,  0.5f * depth,
-                0.5f * width,  0.5f * height,  0.5f * depth,
-                -0.5f * width,  0.5f * height,  0.5f * depth,
+                -0.5f * width, -0.5f * height,  0.5f * depth, 1,1,
+                0.5f * width, -0.5f * height,  0.5f * depth,  0,1,
+                0.5f * width,  0.5f * height,  0.5f * depth,  0,0,
+                -0.5f * width,  0.5f * height,  0.5f * depth, 1,0,
                 // back
-                -0.5f * width, -0.5f * height, -0.5f * depth,
-                0.5f * width, -0.5f * height, -0.5f * depth,
-                0.5f * width,  0.5f * height, -0.5f * depth,
-                -0.5f * width,  0.5f * height, -0.5f * depth
+                -0.5f * width, -0.5f * height, -0.5f * depth, 1,1,
+                0.5f * width, -0.5f * height, -0.5f * depth,  0,1,
+                0.5f * width,  0.5f * height, -0.5f * depth,  0,0,
+                -0.5f * width,  0.5f * height, -0.5f * depth, 1,0
             };
 
             indices = std::vector<GLuint>{

@@ -51,14 +51,6 @@ namespace gel
     {
         GLuint vao,vbo,ibo;
         int ibo_size,vbo_size;
-        
-        /*void draw(GLenum mode){
-            glBindVertexArray(vao);
-            //SDL_Log("VAO: %i",vao);
-            glDrawElements(mode,ibo_size,GL_UNSIGNED_INT,0);
-            //Reset state.
-            //glBindVertexArray(0);
-        }*/
     };
 }
 

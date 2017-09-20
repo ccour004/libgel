@@ -83,12 +83,11 @@ public:
                     glBindVertexArray(vertex->vao);
                 }
                 glDrawElements(GL_TRIANGLES,vertex->ibo_size,GL_UNSIGNED_INT,0);
-                //vertex->draw(GL_TRIANGLES);
             }
             if(shader) shader->end();
          });
 
-         SDL_Log("RENDER TIME: %f",(float)std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now() - now).count());
+         //SDL_Log("RENDER TIME: %f",(float)std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now() - now).count());
     }
 };
 

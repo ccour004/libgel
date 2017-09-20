@@ -130,6 +130,6 @@ public:
     void update(entityx::EntityManager& entities,entityx::EventManager& events,entityx::TimeDelta dt) override{
         std::chrono::time_point<std::chrono::system_clock> now = std::chrono::system_clock::now();
         world->stepSimulation(std::min(1.0f/30.0f,(float)dt),MAX_SUB_STEPS,FIXED_TIME_STEP);/*->stepSimulation( 1.0f / 60.0f, 0 );*/
-        SDL_Log("PHYSICS TIME: %f",(float)std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now() - now).count());
+        //SDL_Log("PHYSICS TIME: %f",(float)std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now() - now).count());
     }
 };

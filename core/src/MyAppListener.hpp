@@ -116,7 +116,7 @@ public:
     MyAppListener(){}
  bool create(){
     DefaultAppListener::create();
-    
+
     //Setup gl settings.
     glEnable(GL_DEPTH_TEST);
     glClearDepthf(1.0f);
@@ -168,25 +168,30 @@ public:
             50.0f, 2.0f, 50.0f}                             
     };
 
+    entityx::Entity obs_texture = newEntity();
+    obs_texture.assign<gel::Texture>(gel::Texture("abcdef",true));
+
     for(std::vector<float> obstruction:obstructions){
         //Build vertex.
         std::vector<GLfloat> tempvertices = std::vector<GLfloat>();
         std::vector<GLuint> tempindices = std::vector<GLuint>();
         gel::ShapeBuilder::buildBox(tempvertices,tempindices,obstruction[3],obstruction[4],obstruction[5]);
         groundVertex = newEntity();
-        groundVertex.assign<gel::ShaderHandle>(gel::ShaderHandle(altShader));
+        groundVertex.assign<gel::ShaderHandle>(gel::ShaderHandle(texShader));
         groundVertex.assign<gel::Vertex>(gel::Vertex(
             std::vector<gel::VertexSpec>{
-                gel::VertexSpec(GL_FLOAT,3,"a_position")
+                gel::VertexSpec(GL_FLOAT,3,"a_position"),
+                gel::VertexSpec(GL_FLOAT,2,"a_texCoord0")
             },tempvertices,tempindices));
         
         //Build ground entity.
         ground = newEntity();
-        ground.assign<gel::ShaderHandle>(gel::ShaderHandle(altShader));
+        ground.assign<gel::ShaderHandle>(gel::ShaderHandle(texShader));
         ground.assign<gel::VertexHandle>(gel::VertexHandle(groundVertex));
+        ground.assign<gel::TextureHandle>(gel::TextureHandle(obs_texture));
         ground.assign<glm::mat4>(glm::mat4());
+        ground.assign<glm::vec4>(glm::vec4(1.0f,1.0f,1.0f,1.0f));
         ground.assign<glm::vec3>(glm::vec3(obstruction[0],obstruction[1],obstruction[2]));
-        ground.assign<glm::vec4>(glm::vec4(((float) rand()) / (float) RAND_MAX,((float) rand()) / (float) RAND_MAX,((float) rand()) / (float) RAND_MAX,1.0f));
         ground.assign<RigidBody>(RigidBody(std::string("test"),0.0f,btVector3(obstruction[0],obstruction[1],obstruction[2]),
             new btBoxShape(btVector3(obstruction[3] / 2.0f,obstruction[4] / 2.0f,obstruction[5] / 2.0f))));
     }
@@ -198,7 +203,7 @@ public:
     sstream>>count;
     sphere = new btSphereShape(1.0f);
     entityx::Entity texture = newEntity();
-    texture.assign<gel::Texture>(gel::Texture("assets/test.jpg"));
+    texture.assign<gel::Texture>(gel::Texture("assets/test.jpg",false));
 
     while(!sstream.eof()){
         sstream>>x>>y>>z;
@@ -221,6 +226,7 @@ public:
  void pause(){}
  void resume(){}
  void dispose(){
-     DefaultAppListener::dispose();delete sphere;
+     DefaultAppListener::dispose();
+     delete sphere;
  }
 };

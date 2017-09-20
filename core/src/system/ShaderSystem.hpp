@@ -42,7 +42,7 @@ namespace gel{
 
     struct ShaderSource{
         std::string fileToString(std::string filename){
-            SDL_RWops* io = SDL_RWFromFile(filename.c_str(),"rb");
+            SDL_RWops* io = SDL_RWFromFile(filename.c_str(),"r");
             if(io != NULL){
                 char name[256];
                 if(SDL_RWread(io,name,sizeof(name),1) > 0)
@@ -52,6 +52,19 @@ namespace gel{
             }
             return "";
         }
+        std::string sanitize(std::string input){
+            std::string str = input;
+            bool openBracket = false;
+            for(int i = 0;i < str.length();i++){
+                if(str[i] == '{' && openBracket) str.erase(str.begin()+i);
+                else if(str[i] == '}' && !openBracket) str.erase(str.begin()+i);
+                
+                if(str[i] == '}') openBracket = false;
+                else if(str[i] == '{') openBracket = true;
+            }
+            SDL_Log("SANITIZED: %s",str.c_str());
+            return str;
+        }
     public:
         GLenum type;
         std::string contents;
@@ -60,7 +73,7 @@ namespace gel{
             this->type = type;
             std::ostringstream stream;
             stream << prepend << fileToString(filename);
-            contents = stream.str();
+            contents = sanitize(stream.str());
         }
     };
 
@@ -86,11 +99,9 @@ namespace gel{
             if(varList.size() > 0){
                 auto search = varList.find(name);
                 if(search != varList.end()){
-                    //SDL_Log("SEARCH FOR %s gives: %i",name.c_str(),search->second.location);
                     return search->second.location;
                 }
             }
-            //SDL_Log("SEARCH FOR %s gives: -1",name.c_str());
             return -1;
         }
         
@@ -248,19 +259,19 @@ namespace gel{
                 for(gel::ShaderSource source:spec.sources){
                     const GLuint shader = glCreateShader(source.type);
                     if(!shader) SDL_Log("Could not create shader!");
-                    else{                           
+                    else{     
+                        //SDL_Log("CODE: %s",source.contents.c_str()); 
                         const char* contents_c_str = source.contents.c_str();
                         const GLint len = (GLint)strlen(contents_c_str);
                         GLint compiled = GL_FALSE;
                         glShaderSource(shader,1,&contents_c_str,&len);
                         glCompileShader(shader);
-                        glGetShaderiv(shader,GL_COMPILE_STATUS,&compiled);
-                                
+                        glGetShaderiv(shader,GL_COMPILE_STATUS,&compiled);  
                         if(!compiled){
                             int bufSize = 256;
                             GLchar log[bufSize];
                             glGetShaderInfoLog(shader,bufSize,0,log);
-                            SDL_Log("COMPILATION ERROR: %s|||%s",log,contents_c_str);
+                            SDL_Log("COMPILATION ERROR: %s ||| %s",log,contents_c_str);
                         }else glAttachShader(program.program,shader);
                         //delete contents_c_str;
                     }

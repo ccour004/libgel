@@ -12,7 +12,7 @@ set(ANDROID_DIR ${HOME_DIR}/android)
 set(DEP ${ANDROID_DIR}/dependencies)
 set(LIBS ${DEP}/libs)
 set(JNI ${DEP}/jni)
-set(DEP_LIST SDL2;SDL2_image;Bullet;entityx)
+set(DEP_LIST SDL2;SDL2_image;SDL2_ttf;Bullet;entityx)
 
 set(ANDROID_APP_NAME libgel_test)
 set(ANDROID_COMPILE_SDK 26)
@@ -191,6 +191,28 @@ else()
 		set_target_properties(SDL2_image PROPERTIES IMPORTED_LOCATION ${binary_dir}/.libs/libSDL2_image.so)
 	#endif()
 
+	#SDL2_ttf
+	#if(FORCE_SYSTEM_LIBRARIES)
+		find_package(SDL2_ttf REQUIRED)
+		include_directories(${SDL2_TTF_INCLUDE_DIRS})
+	#else()
+	#	ExternalProject_Add(SDL2_ttf_DL 
+	#		   URL https://www.libsdl.org/projects/SDL_ttf/release/SDL2_ttf-2.0.14.zip
+	#		   PREFIX ${JNI}/SDL2_ttf
+	#		   CONFIGURE_COMMAND sh ${JNI}/SDL2_ttf/src/SDL2_ttf_DL/configure
+	#		   INSTALL_COMMAND cmake -E echo "Skipping install step."
+	#		   BUILD_COMMAND make)
+
+	#	ExternalProject_Get_Property(SDL2_ttf_DL binary_dir)
+	#	ExternalProject_Get_Property(SDL2_ttf_DL source_dir)
+
+	#	include_directories(${source_dir})
+
+	#	add_library(SDL2_ttf SHARED IMPORTED)
+	#	add_dependencies(SDL2_ttf SDL2_ttf_DL)
+	#	set_target_properties(SDL2_ttf PROPERTIES IMPORTED_LOCATION ${binary_dir}/.libs/libSDL2_ttf.so)
+	#endif()
+
 	#Bullet Physics (v.3, but only using v.2 CPU-based code)
 	ExternalProject_Add(Bullet 
 		    GIT_REPOSITORY https://github.com/bulletphysics/bullet3.git
@@ -253,11 +275,11 @@ else()
 	add_executable(Core ${SOURCE})
 	include_directories(core/src)
 
-        #target_link_libraries(Core Threads::Threads ${OPENGL_LIBRARIES} ${GLEW_LIBRARIES} SDL2 SDL2_image
+        #target_link_libraries(Core Threads::Threads ${OPENGL_LIBRARIES} ${GLEW_LIBRARIES} SDL2 SDL2_image SDL2_ttf
 	#	linearMath common collision dynamics softBody inverseDynamics
 	#	project_entityx)
 
-        target_link_libraries(Core ${OPENGL_LIBRARIES} ${GLEW_LIBRARIES} SDL2 SDL2_image
+        target_link_libraries(Core ${OPENGL_LIBRARIES} ${GLEW_LIBRARIES} SDL2 SDL2_image ${SDL2_TTF_LIBRARIES}
 		linearMath common collision dynamics softBody inverseDynamics
 		project_entityx)
 endif()
