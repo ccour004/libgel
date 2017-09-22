@@ -40,7 +40,7 @@ namespace gel{
         std::chrono::time_point<std::chrono::system_clock> now,lastTime;
         std::chrono::duration<double> delta;
     public:
-        static bool quitFlag,threadFlag;
+        static bool quitFlag,threadFlag,isPaused,isCreated;
         static /*void*/int PhysicsThread(/*entityx::SystemManager**/void* /*systems_ptr*/systems_ptr_v){
             /**/entityx::SystemManager* systems_ptr = (entityx::SystemManager*)systems_ptr_v;/**/
             std::chrono::time_point<std::chrono::system_clock> thread_now,thread_lastTime;
@@ -89,7 +89,8 @@ namespace gel{
         }
 
         entityx::Entity newEntity(){return entities.create();}
-    };
+    };  
     bool DefaultAppListener::quitFlag = false;
     bool DefaultAppListener::threadFlag = false;
+    bool DefaultAppListener::isCreated = false;
 }

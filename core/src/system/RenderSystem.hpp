@@ -31,6 +31,12 @@ SOFTWARE.*/
 #include "VertexSystem.hpp"
 #include <glm/gtx/rotate_vector.hpp>
 
+namespace gel{
+    struct Mesh{
+        //TODO: fill this out!!
+    };
+}
+
 class RenderSystem: public entityx::System<RenderSystem>{
 public:
     static gel::Camera cam;
@@ -53,12 +59,13 @@ public:
 
         eye = glm::rotateY(eye,(float)(dt * rotateAmount * rotateSpeed));
         cam.lookAt(eye,glm::vec3(0,0,0),glm::vec3(0,1,0));
-        entities.each<gel::ShaderHandle,gel::VertexHandle,glm::vec3,glm::vec4,glm::mat4>([](entityx::Entity entity,
-            gel::ShaderHandle& shaderHandle,gel::VertexHandle& vertexHandle,glm::vec3& pos,glm::vec4& color,glm::mat4& model) {
+        entities.each<gel::Asset<gel::ShaderProgram>,gel::Asset<gel::VertexReference>,glm::vec3,glm::vec4,glm::mat4>([](entityx::Entity entity,
+            gel::Asset<gel::ShaderProgram>& shaderHandle,gel::Asset<gel::VertexReference>& vertexHandle,glm::vec3& pos,glm::vec4& color,glm::mat4& model) {
             entityx::ComponentHandle<RigidBody> body = entity.component<RigidBody>();
-            entityx::ComponentHandle<gel::ShaderProgram> shader = shaderHandle.ent.component<gel::ShaderProgram>();
-            entityx::ComponentHandle<gel::VertexReference> vertex = vertexHandle.ent.component<gel::VertexReference>();
-            entityx::ComponentHandle<gel::TextureHandle> textureHandle = entity.component<gel::TextureHandle>();
+            entityx::ComponentHandle<gel::ShaderProgram> shader = shaderHandle.component<gel::ShaderProgram>();
+            entityx::ComponentHandle<gel::VertexReference> vertex = vertexHandle.component<gel::VertexReference>();
+            entityx::ComponentHandle<gel::TextureReference> texture = 
+                entity.component<gel::Asset<gel::TextureReference>>()->get().component<gel::TextureReference>();
    
             if(body->mass == 0.0f) model = glm::translate(glm::mat4(1.0f),pos);
             else{
@@ -73,10 +80,7 @@ public:
                 shader->setUniform("u_projView",cam.getCombined() * model,false);
             }
 
-            if(textureHandle){
-                entityx::ComponentHandle<gel::TextureReference> texture = (*textureHandle.get()).ent.component<gel::TextureReference>();
-                if(texture) glBindTexture(GL_TEXTURE_2D,texture->tex);
-            } 
+            if(texture) glBindTexture(GL_TEXTURE_2D,texture->tex);
             if(vertex){
                 if(lastVAO != vertex->vao){
                     lastVAO = vertex->vao;

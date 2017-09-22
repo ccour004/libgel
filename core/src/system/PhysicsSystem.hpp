@@ -56,11 +56,12 @@ class PhysicsSystem: public entityx::System<PhysicsSystem>,public entityx::Recei
     btCollisionDispatcher* dispatcher;
     btDefaultCollisionConfiguration* config;
     btBroadphaseInterface* broadphase;
-    std::vector<btCollisionShape*> shapes;
 public:
+    static std::vector<btCollisionShape*> shapes;
     btDiscreteDynamicsWorld* world;
     void configure(entityx::EventManager& events) override{
         events.subscribe<entityx::ComponentAddedEvent<RigidBody>>(*this);
+        events.subscribe<entityx::ComponentRemovedEvent<RigidBody>>(*this);
     }
     PhysicsSystem(){
         ///collision configuration contains default setup for memory, collision setup. Advanced users can create their own configuration.
@@ -86,7 +87,6 @@ public:
             //SDL_Log("COMPONENT ADDED: %s",rb->name.c_str());  
 
             //Set the body's position.
-            shapes.push_back(rb->shape);
             btTransform transform;
             transform.setIdentity();
             transform.setOrigin(rb->origin);
@@ -107,8 +107,15 @@ public:
             std::cerr << "Exception caught while adding a rigid body: " << e.what() << std::endl;
         }
     }
+    void receive(const entityx::ComponentRemovedEvent<RigidBody>& event){
+        SDL_Log("Removing rigid body...");
+        //if (event.component.get()->body && event.component.get()->body->getMotionState()) delete event.component.get()->body->getMotionState();
+        //world->removeCollisionObject((btCollisionObject*)event.component.get()->body);
+        SDL_Log("...rigid body remove complete.");
+    }
 
     ~PhysicsSystem(){
+        SDL_Log("Removing physics system...");
         //Delete rigid bodies
         for (int i = world->getNumCollisionObjects() - 1; i >= 0; i--) {
             btCollisionObject *obj = world->getCollisionObjectArray()[i];
@@ -119,7 +126,7 @@ public:
         }
 
         //Delete collision shapes
-        //for(btCollisionShape* shape:shapes) delete shape;
+        for(btCollisionShape* shape:shapes) delete shape;
 
         delete world;
         delete solver;
@@ -129,7 +136,8 @@ public:
     }
     void update(entityx::EntityManager& entities,entityx::EventManager& events,entityx::TimeDelta dt) override{
         std::chrono::time_point<std::chrono::system_clock> now = std::chrono::system_clock::now();
-        world->stepSimulation(std::min(1.0f/30.0f,(float)dt),MAX_SUB_STEPS,FIXED_TIME_STEP);/*->stepSimulation( 1.0f / 60.0f, 0 );*/
+        world->stepSimulation(std::min(1.0f/30.0f,(float)dt),MAX_SUB_STEPS,FIXED_TIME_STEP);
         //SDL_Log("PHYSICS TIME: %f",(float)std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now() - now).count());
     }
 };
+std::vector<btCollisionShape*> PhysicsSystem::shapes;

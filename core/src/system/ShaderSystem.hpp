@@ -22,18 +22,13 @@ SOFTWARE.*/
 
 #pragma once
 
-#include <entityx/entityx.h>
+#include "../Common.hpp"
 #include <map>
 #include <string>
 #include <sstream>
 #include <fstream>
 
 namespace gel{
-    struct ShaderHandle{
-        entityx::Entity ent;
-        ShaderHandle(entityx::Entity& ent):ent(ent){}
-    };
-
     struct ShaderVariable{
         GLint location;
         GLenum type;

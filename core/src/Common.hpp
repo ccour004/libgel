@@ -34,6 +34,7 @@ SOFTWARE.*/
 #include <SDL_image.h>
 #include <sstream>
 #include <memory>
+#include <entityx/entityx.h>
 
 char* file_read(const char* filename) {
     SDL_RWops *rw = SDL_RWFromFile(filename, "rb");
@@ -62,3 +63,18 @@ char* file_read(const char* filename) {
 std::string fileToString(const std::string& filename){
 return std::string(file_read(filename.c_str()));
 }
+
+namespace gel{
+    template<class T>
+    class Asset{
+        entityx::Entity parent;
+    public:
+        Asset(){}
+        Asset(entityx::Entity parent):parent(parent){}
+        entityx::Entity get(){return parent;}
+        template<class U> entityx::ComponentHandle<U> component(){return parent.component<U>();}
+        template<class U> gel::Asset<T> assign(U component){parent.assign<U>(component); return *this;}
+    };
+}
+
+template<class T> gel::Asset<T> newAsset(entityx::Entity ent){return gel::Asset<T>(ent);}

@@ -23,15 +23,10 @@ SOFTWARE.*/
 #pragma once
 
 #define BUFFER_OFFSET(idx) (static_cast<char*>(0) + (idx))
-#include <entityx/entityx.h>
+#include "../Common.hpp"
 
 namespace gel
 {
-    struct VertexHandle{
-        entityx::Entity ent;
-       VertexHandle(entityx::Entity& ent):ent(ent){}
-    };
-
     struct VertexSpec{
         GLenum type;
         GLint size;
@@ -57,9 +52,9 @@ namespace gel
 class VertexSystem: public entityx::System<VertexSystem>,public entityx::Receiver<VertexSystem>{ 
 public:
     void update(entityx::EntityManager& entities,entityx::EventManager& events,entityx::TimeDelta dt) override{
-        entities.each<gel::ShaderHandle,gel::Vertex>([](entityx::Entity entity,gel::ShaderHandle& shaderHandle,gel::Vertex& vertex) {
+        entities.each<gel::Asset<gel::ShaderProgram>,gel::Vertex>([](entityx::Entity entity,gel::Asset<gel::ShaderProgram>& shaderHandle,gel::Vertex& vertex) {
             gel::VertexReference ref;
-            entityx::ComponentHandle<gel::ShaderProgram> shader = shaderHandle.ent.component<gel::ShaderProgram>();
+            entityx::ComponentHandle<gel::ShaderProgram> shader = shaderHandle.component<gel::ShaderProgram>();
 
             if(shader){
                 ref.ibo_size = vertex.indices.size();

@@ -22,13 +22,9 @@ SOFTWARE.*/
 
 #pragma once
 
-#include <entityx/entityx.h>
+#include "../Common.hpp"
 
 namespace gel{
-    struct TextureHandle{
-        entityx::Entity ent;
-       TextureHandle(entityx::Entity& ent):ent(ent){}
-    };
     struct Texture{
         std::string filename;
         bool isSurface;
@@ -124,6 +120,9 @@ public:
     }
     void receive(const entityx::ComponentRemovedEvent<gel::TextureReference>& event){
         SDL_Log("Removing texture...");
+    }
+    ~TextureSystem(){
+        SDL_Log("Removing texture system...");
         TTF_CloseFont(font);
         TTF_Quit();
     }

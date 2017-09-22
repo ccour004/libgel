@@ -196,12 +196,12 @@ else()
 		find_package(SDL2_ttf REQUIRED)
 		include_directories(${SDL2_TTF_INCLUDE_DIRS})
 	#else()
-	#	ExternalProject_Add(SDL2_ttf_DL 
-	#		   URL https://www.libsdl.org/projects/SDL_ttf/release/SDL2_ttf-2.0.14.zip
-	#		   PREFIX ${JNI}/SDL2_ttf
-	#		   CONFIGURE_COMMAND sh ${JNI}/SDL2_ttf/src/SDL2_ttf_DL/configure
-	#		   INSTALL_COMMAND cmake -E echo "Skipping install step."
-	#		   BUILD_COMMAND make)
+		ExternalProject_Add(SDL2_ttf_DL 
+			   URL https://www.libsdl.org/projects/SDL_ttf/release/SDL2_ttf-2.0.14.zip
+			   PREFIX ${JNI}/SDL2_ttf
+			   CONFIGURE_COMMAND sh ${JNI}/SDL2_ttf/src/SDL2_ttf_DL/configure
+			   INSTALL_COMMAND cmake -E echo "Skipping install step."
+			   BUILD_COMMAND cmake -E echo "Skipping build step.")
 
 	#	ExternalProject_Get_Property(SDL2_ttf_DL binary_dir)
 	#	ExternalProject_Get_Property(SDL2_ttf_DL source_dir)
