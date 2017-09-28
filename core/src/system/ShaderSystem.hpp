@@ -28,6 +28,10 @@ SOFTWARE.*/
 #include <sstream>
 #include <fstream>
 
+#include <glm/vec4.hpp> // glm::vec4
+#include <glm/mat4x4.hpp> // glm::mat4
+#include <glm/gtc/type_ptr.hpp>
+
 namespace gel{
     struct ShaderVariable{
         GLint location;

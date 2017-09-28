@@ -120,33 +120,35 @@ public:
             
     //Setup input.
     setRawInputProcessor(std::make_shared<MyRawInputProcessor>());
+
+    //Fonts
+    gel::Asset<gel::FontReference> sans_reg_16 = assets.load<gel::FontReference,gel::Font>("assets/font/OpenSans-Regular.ttf",16);
         
     //Setup shader program.
     std::string prepend = "#version 300 es\n";
-    gel::Asset<gel::ShaderProgram> defaultShader = newAsset<gel::ShaderProgram>(newEntity()).assign(gel::ShaderSpec("default",std::vector<gel::ShaderSource>{
+    gel::Asset<gel::ShaderProgram> defaultShader = assets.load<gel::ShaderProgram,gel::ShaderSpec>("default",std::vector<gel::ShaderSource>{
         gel::ShaderSource("assets/default.vert",GL_VERTEX_SHADER,prepend),
         gel::ShaderSource("assets/default.frag",GL_FRAGMENT_SHADER,prepend)
-    })),
-    alShader = newAsset<gel::ShaderProgram>(newEntity()).assign(gel::ShaderSpec("alt",std::vector<gel::ShaderSource>{
+    }),
+    alShader = assets.load<gel::ShaderProgram,gel::ShaderSpec>("alt",std::vector<gel::ShaderSource>{
         gel::ShaderSource("assets/alt.vert",GL_VERTEX_SHADER,prepend),
         gel::ShaderSource("assets/alt.frag",GL_FRAGMENT_SHADER,prepend)
-    })),
-    texShader = newAsset<gel::ShaderProgram>(newEntity()).assign(gel::ShaderSpec("tex",std::vector<gel::ShaderSource>{
+    }),
+    texShader = assets.load<gel::ShaderProgram,gel::ShaderSpec>("tex",std::vector<gel::ShaderSource>{
         gel::ShaderSource("assets/texTest.vert",GL_VERTEX_SHADER,prepend),
         gel::ShaderSource("assets/texTest.frag",GL_FRAGMENT_SHADER,prepend)
-    }));
+    });
     
     //Create sphere.
     std::vector<GLfloat> vertices = std::vector<GLfloat>();
     std::vector<GLuint> indices = std::vector<GLuint>();
     PhysicsSystem::shapes.push_back(new btSphereShape(1.0f));
     gel::ShapeBuilder::buildSphere(vertices,indices,2,2,2,20,20);
-    gel::Asset<gel::VertexReference> groundVertex, sphereVertex = newAsset<gel::VertexReference>(newEntity()).assign(texShader)
-        .assign(gel::Vertex(
+    gel::Asset<gel::VertexReference> groundVertex, sphereVertex = assets.load<gel::VertexReference,gel::Vertex>(
             std::vector<gel::VertexSpec>{
                 gel::VertexSpec(GL_FLOAT,3,"a_position"),
                 gel::VertexSpec(GL_FLOAT,2,"a_texCoord0")
-            },vertices,indices));
+            },vertices,indices).assign(texShader);
     
     //Create ground.
     std::vector<float> obstructions[] = {
@@ -162,22 +164,20 @@ public:
             50.0f, 2.0f, 50.0f}                             
     };
 
-    gel::Asset<gel::TextureReference> obsTexture = newAsset<gel::TextureReference>(newEntity()).assign(gel::Texture("abcdef",true));
+    gel::Asset<gel::TextureReference> obsTexture = assets.load<gel::TextureReference,gel::Texture>("abcdef").assign(sans_reg_16);
     for(std::vector<float> obstruction:obstructions){
         //Build vertex.
         std::vector<GLfloat> tempvertices = std::vector<GLfloat>();
         std::vector<GLuint> tempindices = std::vector<GLuint>();
         gel::ShapeBuilder::buildBox(tempvertices,tempindices,obstruction[3],obstruction[4],obstruction[5]);
-        groundVertex = newAsset<gel::VertexReference>(newEntity()).assign(texShader)
-            .assign(gel::Vertex(
-                std::vector<gel::VertexSpec>{
-                    gel::VertexSpec(GL_FLOAT,3,"a_position"),
-                    gel::VertexSpec(GL_FLOAT,2,"a_texCoord0")
-                },tempvertices,tempindices));
+        groundVertex = assets.load<gel::VertexReference,gel::Vertex>(std::vector<gel::VertexSpec>{
+            gel::VertexSpec(GL_FLOAT,3,"a_position"),
+            gel::VertexSpec(GL_FLOAT,2,"a_texCoord0")
+        },tempvertices,tempindices).assign(texShader);
         
         //Build ground entity.
         PhysicsSystem::shapes.push_back(new btBoxShape(btVector3(obstruction[3] / 2.0f,obstruction[4] / 2.0f,obstruction[5] / 2.0f)));
-        newAsset<gel::Mesh>(newEntity()).assign(texShader).assign(groundVertex).assign(obsTexture)
+        assets.load<gel::Mesh>().assign(texShader).assign(groundVertex).assign(obsTexture)
             .assign(glm::mat4()).assign(glm::vec4(1.0f,1.0f,1.0f,1.0f)).assign(glm::vec3(obstruction[0],obstruction[1],obstruction[2]))
             .assign(RigidBody(std::string("test"),0.0f,btVector3(obstruction[0],obstruction[1],obstruction[2]),
                 PhysicsSystem::shapes[PhysicsSystem::shapes.size()-1]));
@@ -187,11 +187,11 @@ public:
     int count = 0;
     float x,y,z;
     sstream>>count;
-    gel::Asset<gel::TextureReference> sphereTexture = newAsset<gel::TextureReference>(newEntity()).assign(gel::Texture("assets/test.jpg",false));
+    gel::Asset<gel::TextureReference> sphereTexture = assets.load<gel::TextureReference,gel::Texture>("assets/test.jpg");
 
     while(!sstream.eof()){
         sstream>>x>>y>>z;
-        newAsset<gel::Mesh>(newEntity()).assign(texShader).assign(sphereVertex).assign(sphereTexture)
+        assets.load<gel::Mesh>().assign(texShader).assign(sphereVertex).assign(sphereTexture)
             .assign(glm::mat4()).assign(glm::vec3(x,y,z))
             .assign(glm::vec4(((float) rand()) / (float) RAND_MAX,((float) rand()) / (float) RAND_MAX,((float) rand()) / (float) RAND_MAX,1.0f))
             .assign(RigidBody(std::string("test"),10.0f,btVector3(x,y,z),PhysicsSystem::shapes[0]));

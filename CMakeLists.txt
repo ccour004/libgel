@@ -193,24 +193,27 @@ else()
 
 	#SDL2_ttf
 	#if(FORCE_SYSTEM_LIBRARIES)
-		find_package(SDL2_ttf REQUIRED)
-		include_directories(${SDL2_TTF_INCLUDE_DIRS})
+	#	find_package(SDL2_ttf REQUIRED)
+	#	include_directories(${SDL2_TTF_INCLUDE_DIRS})
 	#else()
 		ExternalProject_Add(SDL2_ttf_DL 
 			   URL https://www.libsdl.org/projects/SDL_ttf/release/SDL2_ttf-2.0.14.zip
 			   PREFIX ${JNI}/SDL2_ttf
-			   CONFIGURE_COMMAND sh ${JNI}/SDL2_ttf/src/SDL2_ttf_DL/configure
+			   CONFIGURE_COMMAND sh ${JNI}/SDL2_ttf/src/SDL2_ttf_DL/external/freetype-2.4.12/configure 
+				COMMAND make -C ${JNI}/SDL2_ttf/src/SDL2_ttf_DL/external/freetype-2.4.12
+				COMMAND make install -C ${JNI}/SDL2_ttf/src/SDL2_ttf_DL/external/freetype-2.4.12
+				COMMAND sh ${JNI}/SDL2_ttf/src/SDL2_ttf_DL/configure
 			   INSTALL_COMMAND cmake -E echo "Skipping install step."
-			   BUILD_COMMAND cmake -E echo "Skipping build step.")
+			   BUILD_COMMAND make)
 
-	#	ExternalProject_Get_Property(SDL2_ttf_DL binary_dir)
-	#	ExternalProject_Get_Property(SDL2_ttf_DL source_dir)
+		ExternalProject_Get_Property(SDL2_ttf_DL binary_dir)
+		ExternalProject_Get_Property(SDL2_ttf_DL source_dir)
 
-	#	include_directories(${source_dir})
+		include_directories(${source_dir})
 
-	#	add_library(SDL2_ttf SHARED IMPORTED)
-	#	add_dependencies(SDL2_ttf SDL2_ttf_DL)
-	#	set_target_properties(SDL2_ttf PROPERTIES IMPORTED_LOCATION ${binary_dir}/.libs/libSDL2_ttf.so)
+		add_library(SDL2_ttf SHARED IMPORTED)
+		add_dependencies(SDL2_ttf SDL2_ttf_DL)
+		set_target_properties(SDL2_ttf PROPERTIES IMPORTED_LOCATION ${binary_dir}/.libs/libSDL2_ttf.so)
 	#endif()
 
 	#Bullet Physics (v.3, but only using v.2 CPU-based code)
@@ -279,7 +282,7 @@ else()
 	#	linearMath common collision dynamics softBody inverseDynamics
 	#	project_entityx)
 
-        target_link_libraries(Core ${OPENGL_LIBRARIES} ${GLEW_LIBRARIES} SDL2 SDL2_image ${SDL2_TTF_LIBRARIES}
+        target_link_libraries(Core ${OPENGL_LIBRARIES} ${GLEW_LIBRARIES} SDL2 SDL2_image SDL2_ttf
 		linearMath common collision dynamics softBody inverseDynamics
 		project_entityx)
 endif()

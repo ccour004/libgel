@@ -27,18 +27,16 @@ SOFTWARE.*/
 #include <Application.hpp>
 #include <chrono>
 
-#include "system/RenderSystem.hpp"
-#include "system/PhysicsSystem.hpp"
-#include "system/TextureSystem.hpp"
-#include "system/ShaderSystem.hpp"
-#include "system/VertexSystem.hpp"
+#include "system/AssetSystem.hpp"
 
 #include <thread>
 
 namespace gel{
-    class DefaultAppListener: public gel::ApplicationListener,entityx::EntityX{
+    class DefaultAppListener: public gel::ApplicationListener{
         std::chrono::time_point<std::chrono::system_clock> now,lastTime;
         std::chrono::duration<double> delta;
+    protected:
+        AssetSystem assets;
     public:
         static bool quitFlag,threadFlag,isPaused,isCreated;
         static /*void*/int PhysicsThread(/*entityx::SystemManager**/void* /*systems_ptr*/systems_ptr_v){
@@ -56,12 +54,13 @@ namespace gel{
         }
         bool create(){
             //Entityx configuration.
-            systems.add<PhysicsSystem>();
-            systems.add<RenderSystem>();
-            systems.add<TextureSystem>();
-            systems.add<ShaderSystem>();
-            systems.add<VertexSystem>();
-            systems.configure(); 
+            assets.getSystems().add<PhysicsSystem>();
+            assets.getSystems().add<RenderSystem>();
+            assets.getSystems().add<TextureSystem>();
+            assets.getSystems().add<FontSystem>();
+            assets.getSystems().add<ShaderSystem>();
+            assets.getSystems().add<VertexSystem>();
+            assets.getSystems().configure(); 
             return true;
         }
 
@@ -69,26 +68,27 @@ namespace gel{
             if(!threadFlag){
                 //Thread configuration.
                 //std::thread(PhysicsThread,&systems).detach();
-                SDL_DetachThread(SDL_CreateThread(PhysicsThread, "PhysicsThread",&systems));
+                SDL_DetachThread(SDL_CreateThread(PhysicsThread, "PhysicsThread",&assets.getSystems()));
                 threadFlag = true;
             }     
             now = std::chrono::system_clock::now();
             delta = now - lastTime;lastTime = now;
             entityx::TimeDelta dt = std::chrono::duration_cast<std::chrono::milliseconds>(delta).count();
             
-            systems.update<TextureSystem>(dt);
-            systems.update<VertexSystem>(dt);
-            systems.update<ShaderSystem>(dt);
-            //systems.update<PhysicsSystem>(dt);
-            systems.update<RenderSystem>(dt);
+            assets.getSystems().update<TextureSystem>(dt);
+            assets.getSystems().update<FontSystem>(dt);
+            assets.getSystems().update<VertexSystem>(dt);
+            assets.getSystems().update<ShaderSystem>(dt);
+            //assets.getSystems().update<PhysicsSystem>(dt);
+            assets.getSystems().update<RenderSystem>(dt);
         }
 
         void dispose(){
             quitFlag = true;
-            entities.reset();
+            assets.getEntities().reset();
         }
 
-        entityx::Entity newEntity(){return entities.create();}
+        entityx::Entity newEntity(){return assets.getEntities().create();}
     };  
     bool DefaultAppListener::quitFlag = false;
     bool DefaultAppListener::threadFlag = false;

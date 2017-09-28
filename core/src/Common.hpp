@@ -76,5 +76,3 @@ namespace gel{
         template<class U> gel::Asset<T> assign(U component){parent.assign<U>(component); return *this;}
     };
 }
-
-template<class T> gel::Asset<T> newAsset(entityx::Entity ent){return gel::Asset<T>(ent);}
