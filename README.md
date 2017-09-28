@@ -8,8 +8,8 @@ How to build:
 * In CMakeLists.txt: change the HOME_DIR variable to the full path of the libgel folder on your machine!
 * The default ABI for Android is: arm64-v8a. Make sure to change this if this doesn't match your target device.
 * Connect an Android device to your build machine via ADB.
-* Run ./build.sh (note: this is assuming a Unix-based build machine for now - this will change).
-* Run ./clean.sh to clean up your build environment.
+* [NOTE: Must be root!] Run ./build.sh (note: this is assuming a Unix-based build machine for now - this will change).
+* [NOTE: Must be root!] Run ./clean.sh to clean up your build environment.
 
 Notes:
 ------
