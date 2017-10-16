@@ -32,7 +32,7 @@ namespace gel
 {
     class Camera
     {
-        glm::mat4 projection,view;
+        glm::mat4 projection,ortho,view;
     public:
         float fovY,aspect,near,far,width,height;
 
@@ -40,6 +40,7 @@ namespace gel
         Camera(float fovY,float width,float height,float near,float far):
             fovY(fovY),width(width),height(height),aspect(width/height),near(near),far(far),view(glm::mat4(1.0f)){
                 projection = glm::perspective(fovY,aspect,near,far);
+                ortho = glm::ortho(0.0f,width,height,0.0f,near,far);
             }
         ~Camera(){};
         
@@ -67,10 +68,17 @@ namespace gel
             this->width = width;this->height = height;
             aspect = width / height;
             projection = glm::perspective(fovY,aspect,near,far);
+            ortho = glm::ortho(0.0f,width,height,0.0f,near,far);
         }
         
         glm::mat4 getCombined(){
             return projection * view;
         }
+
+        glm::mat4 getOrtho(){
+            return ortho;
+        }
     };
+
+
 }

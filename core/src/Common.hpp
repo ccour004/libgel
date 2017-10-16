@@ -67,6 +67,7 @@ return std::string(file_read(filename.c_str()));
 namespace gel{
     template<class T>
     class Asset{
+        //TODO: Load asset from AssetSource. Allow for specifying if source should be kept for potential future reloading.
         entityx::Entity parent;
     public:
         Asset(){}
@@ -74,5 +75,9 @@ namespace gel{
         entityx::Entity get(){return parent;}
         template<class U> entityx::ComponentHandle<U> component(){return parent.component<U>();}
         template<class U> gel::Asset<T> assign(U component){parent.assign<U>(component); return *this;}
+    };
+
+    class AssetSource{
+    //TODO: Could be a file, streaming source, or binary data
     };
 }

@@ -63,7 +63,7 @@ public:
     entityx::EntityManager& getEntities(){return entities;}
 
     /*template<class T> bool isQueued(gel::Asset<T> asset){
-        return (asset.component<gel::Queued>() == nullptr)?false:true;
+        return (bool)asset.component<gel::Queued>();
     }
 
     template<class T> bool isLoaded(gel::Asset<T> asset){

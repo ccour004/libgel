@@ -273,6 +273,19 @@ else()
 	set_target_properties(project_entityx PROPERTIES IMPORTED_LOCATION ${binary_dir}/libentityx.so)
 	include_directories(${source_dir})
 
+	#zeromq
+	ExternalProject_Add(libzmq
+		GIT_REPOSITORY https://github.com/zeromq/libzmq.git
+		PREFIX ${JNI}/libzmq
+		INSTALL_COMMAND sudo make -j4 install
+		BUILD_COMMAND make)	
+
+	ExternalProject_Add(cppzmq
+		GIT_REPOSITORY https://github.com/zeromq/cppzmq.git
+		PREFIX ${JNI}/cppzmq
+		INSTALL_COMMAND cmake -E echo "Skipping install step."
+		BUILD_COMMAND make)	
+
 	#final setup
 	aux_source_directory(core/src/ SOURCE)
 	add_executable(Core ${SOURCE})

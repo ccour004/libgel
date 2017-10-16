@@ -59,6 +59,8 @@ public:
 
         eye = glm::rotateY(eye,(float)(dt * rotateAmount * rotateSpeed));
         cam.lookAt(eye,glm::vec3(0,0,0),glm::vec3(0,1,0));
+
+        //3D models
         entities.each<gel::Asset<gel::ShaderProgram>,gel::Asset<gel::VertexReference>,glm::vec3,glm::vec4,glm::mat4>([](entityx::Entity entity,
             gel::Asset<gel::ShaderProgram>& shaderHandle,gel::Asset<gel::VertexReference>& vertexHandle,glm::vec3& pos,glm::vec4& color,glm::mat4& model) {
             entityx::ComponentHandle<RigidBody> body = entity.component<RigidBody>();
@@ -78,6 +80,30 @@ public:
                 shader->begin();
                 shader->setAttribute("a_color",std::vector<GLfloat>{color.r,color.g,color.b,color.a});
                 shader->setUniform("u_projView",cam.getCombined() * model,false);
+            }
+
+            if(texture) glBindTexture(GL_TEXTURE_2D,texture->tex);
+            if(vertex){
+                if(lastVAO != vertex->vao){
+                    lastVAO = vertex->vao;
+                    glBindVertexArray(vertex->vao);
+                }
+                glDrawElements(GL_TRIANGLES,vertex->ibo_size,GL_UNSIGNED_INT,0);
+            }
+            if(shader) shader->end();
+         });
+
+         //2D elements
+         entities.each<gel::Asset<gel::ShaderProgram>,gel::Asset<gel::TextureReference>,gel::Asset<gel::VertexReference>,glm::vec2,glm::vec4>([](entityx::Entity entity,
+            gel::Asset<gel::ShaderProgram>& shaderHandle,gel::Asset<gel::TextureReference>& texHandle,gel::Asset<gel::VertexReference>& vertexHandle,glm::vec2& pos,glm::vec4& color) {
+            entityx::ComponentHandle<gel::ShaderProgram> shader = shaderHandle.component<gel::ShaderProgram>();
+            entityx::ComponentHandle<gel::VertexReference> vertex = vertexHandle.component<gel::VertexReference>();
+            entityx::ComponentHandle<gel::TextureReference> texture = texHandle.component<gel::TextureReference>(); 
+
+            if(shader){
+                shader->begin();
+                shader->setAttribute("a_color",std::vector<GLfloat>{color.r,color.g,color.b,color.a});
+                shader->setUniform("u_projView",cam.getOrtho() * glm::translate(glm::mat4(1.0f),glm::vec3(pos.x,pos.y,0.0f)),false);
             }
 
             if(texture) glBindTexture(GL_TEXTURE_2D,texture->tex);

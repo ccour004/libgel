@@ -94,12 +94,14 @@ public:
         events.subscribe<entityx::ComponentRemovedEvent<gel::TextureReference>>(*this);
     }
     void update(entityx::EntityManager& entities,entityx::EventManager& events,entityx::TimeDelta dt) override{
+        glEnable (GL_BLEND); 
+        glBlendFunc (GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA); 
         entities.each<gel::Texture,gel::Asset<gel::FontReference>>([](entityx::Entity entity,gel::Texture& texture,gel::Asset<gel::FontReference>& font) {
             entityx::ComponentHandle<gel::FontReference> ref = font.get().component<gel::FontReference>();
             if(ref){
                 SDL_Color textColor = {0,0,0};
                 SDL_Surface* image;
-                if(!(image = TTF_RenderText_Solid(ref->font,texture.filename.c_str(),textColor))){
+                if(!(image = TTF_RenderText_Blended/*Solid*/(ref->font,texture.filename.c_str(),textColor))){
                     SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,"Error rendering TTF surface! \n");
                     return;     
                 }else SDL_Log("TTF RENDER - SUCCESS! %i,%i",image->w,image->h);
@@ -107,10 +109,7 @@ public:
             }
         });
         entities.each<gel::Texture>([](entityx::Entity entity,gel::Texture& texture) {
-            SDL_Surface* image = IMG_Load(texture.filename.c_str());
-
-            //glEnable (GL_BLEND); 
-            //glBlendFunc (GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);         
+            SDL_Surface* image = IMG_Load(texture.filename.c_str());        
             loadTexture(image,entity);
         });
     }

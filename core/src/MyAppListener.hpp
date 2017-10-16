@@ -164,7 +164,9 @@ public:
             50.0f, 2.0f, 50.0f}                             
     };
 
-    gel::Asset<gel::TextureReference> obsTexture = assets.load<gel::TextureReference,gel::Texture>("abcdef").assign(sans_reg_16);
+    gel::Asset<gel::TextureReference> obsTexture = assets.load<gel::TextureReference,gel::Texture>("Open Sans Regular").assign(sans_reg_16);
+    gel::Asset<gel::TextureReference> sphereTexture = assets.load<gel::TextureReference,gel::Texture>("assets/test.jpg");
+    
     for(std::vector<float> obstruction:obstructions){
         //Build vertex.
         std::vector<GLfloat> tempvertices = std::vector<GLfloat>();
@@ -177,25 +179,42 @@ public:
         
         //Build ground entity.
         PhysicsSystem::shapes.push_back(new btBoxShape(btVector3(obstruction[3] / 2.0f,obstruction[4] / 2.0f,obstruction[5] / 2.0f)));
-        assets.load<gel::Mesh>().assign(texShader).assign(groundVertex).assign(obsTexture)
+        assets.load<gel::Mesh>()
             .assign(glm::mat4()).assign(glm::vec4(1.0f,1.0f,1.0f,1.0f)).assign(glm::vec3(obstruction[0],obstruction[1],obstruction[2]))
             .assign(RigidBody(std::string("test"),0.0f,btVector3(obstruction[0],obstruction[1],obstruction[2]),
-                PhysicsSystem::shapes[PhysicsSystem::shapes.size()-1]));
+                PhysicsSystem::shapes[PhysicsSystem::shapes.size()-1]))
+            .assign(texShader).assign(groundVertex).assign(sphereTexture);
     }
     
     std::stringstream sstream(fileToString("assets/cube-drop.txt"));
     int count = 0;
     float x,y,z;
     sstream>>count;
-    gel::Asset<gel::TextureReference> sphereTexture = assets.load<gel::TextureReference,gel::Texture>("assets/test.jpg");
 
     while(!sstream.eof()){
         sstream>>x>>y>>z;
-        assets.load<gel::Mesh>().assign(texShader).assign(sphereVertex).assign(sphereTexture)
+        assets.load<gel::Mesh>()
             .assign(glm::mat4()).assign(glm::vec3(x,y,z))
             .assign(glm::vec4(((float) rand()) / (float) RAND_MAX,((float) rand()) / (float) RAND_MAX,((float) rand()) / (float) RAND_MAX,1.0f))
-            .assign(RigidBody(std::string("test"),10.0f,btVector3(x,y,z),PhysicsSystem::shapes[0]));
+            .assign(RigidBody(std::string("test"),10.0f,btVector3(x,y,z),PhysicsSystem::shapes[0]))
+            .assign(texShader).assign(sphereVertex).assign(sphereTexture);
     }
+
+    //Build UI elements.
+    float width = 110.0f,height = 40.0f;
+    std::vector<GLfloat> uiVerts = std::vector<GLfloat>{
+        -0.5f * width, -0.5f * height,  -1.0f, 0,0,
+         0.5f * width, -0.5f * height,  -1.0f, 1,0,
+         0.5f * width,  0.5f * height,  -1.0f, 1,1,
+        -0.5f * width,  0.5f * height,  -1.0f, 0,1};
+    std::vector<GLuint> uiIndices = std::vector<GLuint>{0, 1, 2, 2, 3, 0};
+    gel::Asset<gel::VertexReference> uiVertex = assets.load<gel::VertexReference,gel::Vertex>(
+            std::vector<gel::VertexSpec>{
+                gel::VertexSpec(GL_FLOAT,3,"a_position"),
+                gel::VertexSpec(GL_FLOAT,2,"a_texCoord0")
+            },uiVerts,uiIndices).assign(texShader);
+    assets.load<gel::Mesh>().assign(glm::vec2(100.0f,100.0f)).assign(glm::vec4(1.0f,1.0f,1.0f,1.0f))
+        .assign(texShader).assign(uiVertex).assign(obsTexture);
     return true;
  }
 
