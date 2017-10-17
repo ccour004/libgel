@@ -33,6 +33,7 @@ message(STATUS "BUILDING FOR DESKTOP...")
 			   CONFIGURE_COMMAND cmake -E echo "Skipping configure step."
 			   INSTALL_COMMAND cmake -E echo "Skipping install step."
 			   BUILD_COMMAND cmake -E echo "Skipping build step.")
+ExternalProject_Get_Property(GLM_DL source_dir)
 		include_directories(${source_dir})
 
 	#SDL2
@@ -55,28 +56,17 @@ message(STATUS "BUILDING FOR DESKTOP...")
 	#endif()
 
 	#SDL2_image
-		ExternalProject_Add(SDL2_image_DL 
-			   URL https://www.libsdl.org/projects/SDL_image/release/SDL2_image-2.0.1.zip
-			   PREFIX SDL2_image
-			   CONFIGURE_COMMAND sh /vagrant/build/SDL2_image/src/SDL2_image_DL/configure
-			   INSTALL_COMMAND cmake -E echo "Skipping install step."
-			   BUILD_COMMAND make)
+  	find_package(SDL2_image REQUIRED)
+	if (SDL2IMAGE_FOUND)
+	    include_directories(${SDL2IMAGE_INCLUDE_DIR})
+	endif()      
 
-		ExternalProject_Get_Property(SDL2_image_DL binary_dir)
-		ExternalProject_Get_Property(SDL2_image_DL source_dir)
-
-		include_directories(${source_dir})
-
-		add_library(SDL2_image SHARED IMPORTED)
-		add_dependencies(SDL2_image SDL2_image_DL)
-		set_target_properties(SDL2_image PROPERTIES IMPORTED_LOCATION ${binary_dir}/.libs/libSDL2_image.so)
-	#endif()
 
 	#SDL2_ttf
 		ExternalProject_Add(SDL2_ttf_DL 
 			   URL https://www.libsdl.org/projects/SDL_ttf/release/SDL2_ttf-2.0.14.zip
 			   PREFIX SDL2_ttf
-			   CONFIGURE_COMMAND sudo sh /vagrant/build/SDL2_ttf/src/SDL2_ttf_DL/configure
+			   CONFIGURE_COMMAND sudo sh /home/ubuntu/git/libgel/libgel_alt/linux-i386/build/SDL2_ttf/src/SDL2_ttf_DL/configure
 			   #CONFIGURE_COMMAND sudo sh SDL2_ttf/src/SDL2_ttf_DL/external/freetype-2.4.12/configure 
 			#	COMMAND make -C SDL2_ttf/src/SDL2_ttf_DL/external/freetype-2.4.12
 			#	COMMAND sudo make install -C SDL2_ttf/src/SDL2_ttf_DL/external/freetype-2.4.12
@@ -165,20 +155,7 @@ message(STATUS "BUILDING FOR DESKTOP...")
 	add_dependencies(project_entityx entityx)
 	#set_target_properties(project_entityx PROPERTIES IMPORTED_LOCATION ${binary_dir}/libentityx.so)
 	set_target_properties(project_entityx PROPERTIES IMPORTED_LOCATION ${binary_dir}/libentityx.a)
-	include_directories(${source_dir})
-
-	#zeromq
-	ExternalProject_Add(libzmq
-		GIT_REPOSITORY https://github.com/zeromq/libzmq.git
-		PREFIX libzmq
-		INSTALL_COMMAND sudo make -j4 install
-		BUILD_COMMAND make)	
-
-	ExternalProject_Add(cppzmq
-		GIT_REPOSITORY https://github.com/zeromq/cppzmq.git
-		PREFIX cppzmq
-		INSTALL_COMMAND cmake -E echo "Skipping install step."
-		BUILD_COMMAND make)	
+	include_directories(${source_dir})	
 
 	#final setup
 	aux_source_directory(core/src/ SOURCE)
@@ -188,6 +165,6 @@ message(STATUS "BUILDING FOR DESKTOP...")
         target_link_libraries(Core linearMath common collision dynamics softBody inverseDynamics)
         target_link_libraries(Core ${OPENGL_LIBRARIES} ${GLEW_LIBRARIES} 
 "-L/usr/lib/x86_64-linux-gnu -lSDL2 -Wl,--no-undefined -lm -ldl -lasound -lm -ldl -lpthread -lpulse-simple -lpulse -lsndio -lX11 -lXext -lXcursor -lXinerama -lXi -lXrandr -lXss -lXxf86vm -lwayland-egl -lwayland-client -lwayland-cursor -lxkbcommon -lpthread -lrt"
-                SDL2 SDL2_image SDL2_ttf
+                SDL2 ${SDL2IMAGE_LIBRARY} SDL2_ttf
 		linearMath common collision dynamics softBody inverseDynamics
 		project_entityx)
