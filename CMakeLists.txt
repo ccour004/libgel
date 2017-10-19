@@ -40,6 +40,12 @@ if(${CMAKE_SYSTEM_NAME} MATCHES "Android")
 	#GLM
 	include_directories(${JNI}/GLM/src/GLM_DL)
 
+	#RapidXML
+	include_directories(${JNI}/XML/src/XML_DL)
+
+	#poly2tri
+	include_directories(${JNI}/P2T/src/P2T_DL)
+
 	foreach(DEPENDENCY ${DEP_LIST})
 		message(STATUS "BUILDING DEPENDENCY ${DEPENDENCY}...")
 		add_library(${DEPENDENCY} SHARED IMPORTED)
@@ -145,6 +151,24 @@ else()
 			   BUILD_COMMAND cmake -E echo "Skipping build step.")
 		include_directories(${JNI}/GLM)
 	#endif()
+
+	#RapidXML
+	ExternalProject_Add(XML_DL 
+		URL https://downloads.sourceforge.net/project/rapidxml/rapidxml/rapidxml%201.13/rapidxml-1.13.zip?r=http%3A%2F%2Frapidxml.sourceforge.net%2F&ts=1508434717&use_mirror=astuteinternet
+		PREFIX ${JNI}/XML
+		CONFIGURE_COMMAND cmake -E echo "Skipping configure step."
+		INSTALL_COMMAND cmake -E echo "Skipping install step."
+		BUILD_COMMAND cmake -E echo "Skipping build step.")
+	include_directories(${JNI}/XML)
+
+	#poly2tri
+	ExternalProject_Add(P2T_DL
+		    GIT_REPOSITORY https://github.com/greenm01/poly2tri.git
+		    PREFIX ${JNI}/P2T
+	            CONFIGURE_COMMAND cmake -E echo "Skipping configure step."
+		    INSTALL_COMMAND cmake -E echo "Skipping install step."
+		    BUILD_COMMAND cmake -E echo "Skipping build step.")
+	include_directories(${JNI}/P2T)
 
 	#SDL2
 	#if(FORCE_SYSTEM_LIBRARIES)

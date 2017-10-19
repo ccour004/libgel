@@ -1,0 +1,21 @@
+
+AssetSytem
+-
+
+RenderSystem
+-
+
+PhysicsSystem
+-applyImpulse(ent,vec3)
+
+
+
+//Test
+-setup camera
+-input setup
+-on resize, change camera aspect
+-add shaders
+-build meshes
+-build physics shapes
+-load a bunch of spheres from a file
+-add ui elements

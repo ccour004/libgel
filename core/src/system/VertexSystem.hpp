@@ -33,6 +33,8 @@ namespace gel
         std::string name;
         VertexSpec(GLenum type,GLint size,std::string name):type(type),size(size),name(name){}
     };
+    const VertexSpec POSITION = gel::VertexSpec(GL_FLOAT,3,"a_position"),
+        TEXTURE_0 = gel::VertexSpec(GL_FLOAT,2,"a_texCoord0");
 
     struct Vertex{
         std::vector<VertexSpec> descriptors;

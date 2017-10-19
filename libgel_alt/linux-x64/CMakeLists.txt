@@ -7,13 +7,6 @@ set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
         
 message(STATUS "BUILDING FOR DESKTOP...")
 
-	#Symlinks, or deep-copy directories if host is non-UNIX.
-	#if(UNIX)
-	#	execute_process(COMMAND "${CMAKE_COMMAND}" -E create_symlink ${CMAKE_CURRENT_SOURCE_DIR}/../assets ${CMAKE_CURRENT_SOURCE_DIR}/../assets)
-	#else()
-	#	file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/../assets DESTINATION ${CMAKE_CURRENT_SOURCE_DIR}/assets)
-	#endif()
-
 	#OPENGL (GL and GLU)
 	find_package(OpenGL)
 	if (OPENGL_FOUND)
@@ -33,7 +26,28 @@ message(STATUS "BUILDING FOR DESKTOP...")
 			   CONFIGURE_COMMAND cmake -E echo "Skipping configure step."
 			   INSTALL_COMMAND cmake -E echo "Skipping install step."
 			   BUILD_COMMAND cmake -E echo "Skipping build step.")
-		include_directories(${source_dir})
+	ExternalProject_Get_Property(GLM_DL source_dir)
+	include_directories(${source_dir})
+
+	#RapidXML
+	ExternalProject_Add(XML_DL 
+		URL https://downloads.sourceforge.net/project/rapidxml/rapidxml/rapidxml%201.13/rapidxml-1.13.zip?r=http%3A%2F%2Frapidxml.sourceforge.net%2F&ts=1508434717&use_mirror=astuteinternet
+		PREFIX XML
+		CONFIGURE_COMMAND cmake -E echo "Skipping configure step."
+		INSTALL_COMMAND cmake -E echo "Skipping install step."
+		BUILD_COMMAND cmake -E echo "Skipping build step.")
+	ExternalProject_Get_Property(XML_DL source_dir)
+	include_directories(${source_dir})
+
+	#poly2tri
+	ExternalProject_Add(P2T_DL
+		    GIT_REPOSITORY https://github.com/greenm01/poly2tri.git
+		    PREFIX P2T
+	            CONFIGURE_COMMAND cmake -E echo "Skipping configure step."
+		    INSTALL_COMMAND cmake -E echo "Skipping install step."
+		    BUILD_COMMAND cmake -E echo "Skipping build step.")
+	ExternalProject_Get_Property(P2T_DL source_dir)
+	include_directories(${source_dir})
 
 	#SDL2
 		ExternalProject_Add(SDL2_DL 
@@ -58,7 +72,7 @@ message(STATUS "BUILDING FOR DESKTOP...")
 		ExternalProject_Add(SDL2_image_DL 
 			   URL https://www.libsdl.org/projects/SDL_image/release/SDL2_image-2.0.1.zip
 			   PREFIX SDL2_image
-			   CONFIGURE_COMMAND sh /vagrant/build/SDL2_image/src/SDL2_image_DL/configure
+			   CONFIGURE_COMMAND sh /home/ubuntu/SDL2_image/src/SDL2_image_DL/configure
 			   INSTALL_COMMAND cmake -E echo "Skipping install step."
 			   BUILD_COMMAND make)
 
@@ -73,25 +87,10 @@ message(STATUS "BUILDING FOR DESKTOP...")
 	#endif()
 
 	#SDL2_ttf
-		ExternalProject_Add(SDL2_ttf_DL 
-			   URL https://www.libsdl.org/projects/SDL_ttf/release/SDL2_ttf-2.0.14.zip
-			   PREFIX SDL2_ttf
-			   CONFIGURE_COMMAND sudo sh /vagrant/build/SDL2_ttf/src/SDL2_ttf_DL/configure
-			   #CONFIGURE_COMMAND sudo sh SDL2_ttf/src/SDL2_ttf_DL/external/freetype-2.4.12/configure 
-			#	COMMAND make -C SDL2_ttf/src/SDL2_ttf_DL/external/freetype-2.4.12
-			#	COMMAND sudo make install -C SDL2_ttf/src/SDL2_ttf_DL/external/freetype-2.4.12
-			#	COMMAND sh SDL2_ttf/src/SDL2_ttf_DL/configure
-			   INSTALL_COMMAND cmake -E echo "Skipping install step."
-			   BUILD_COMMAND make)
-
-		ExternalProject_Get_Property(SDL2_ttf_DL binary_dir)
-		ExternalProject_Get_Property(SDL2_ttf_DL source_dir)
-
-		include_directories(${source_dir})
-
-		add_library(SDL2_ttf SHARED IMPORTED)
-		add_dependencies(SDL2_ttf SDL2_ttf_DL)
-		set_target_properties(SDL2_ttf PROPERTIES IMPORTED_LOCATION ${binary_dir}/.libs/libSDL2_ttf.so)
+	find_package(SDL2_ttf REQUIRED)
+	if (SDL2TTF_FOUND)
+	    include_directories(${SDL2TTF_INCLUDE_DIR})
+	endif() 
 	#endif()
 
 	#Bullet Physics (v.3, but only using v.2 CPU-based code)

@@ -26,7 +26,13 @@ SOFTWARE.*/
 
 #include "Camera.hpp"
 #include "Input.hpp"
-#include "ShapeBuilder.hpp"
+#include "helper/UIBuilder.hpp"
+#include "helper/ShapeBuilder.hpp"
+
+#include <iostream>
+#include <fstream>
+#include <vector>
+#include <rapidxml.hpp>
 
 class MyRawInputProcessor: public gel::RawInputProcessor{
 public:
@@ -80,7 +86,7 @@ public:
     
     bool mouseButtonEvent(const SDL_MouseButtonEvent& event){
         switch(event.type){
-            case SDL_MOUSEBUTTONDOWN: SDL_Log("[SDL_MOUSEBUTTONDOWN]");
+            case SDL_MOUSEBUTTONDOWN: SDL_Log("[SDL_MOUSEBUTTONDOWN]: %i,%i",event.x,event.y);
                 RenderSystem::drag = true;
                 break; 
             case SDL_MOUSEBUTTONUP: SDL_Log("[SDL_MOUSEBUTTONUP]");
@@ -108,6 +114,19 @@ public:
 
 class MyAppListener: public gel::DefaultAppListener{
 public:
+ std::string parseGlyph(std::string data){
+    std::stringstream sstream,output;
+    sstream.str(data);
+    std::string temp;
+    while(sstream){
+        sstream >> temp;
+        if(temp.find("z") == 0) output<<"{END}";
+        if(temp.find("M") == 0 || temp.find("M") == 1) output<<"{POINT START}";
+        else if(temp.find("C") == 0) output<<"{BEZIER CUBIC START}";
+        //else output<<temp<<",";
+    }
+    return output.str();
+ }
  bool create(){
     DefaultAppListener::create();
 
@@ -117,12 +136,32 @@ public:
     glDepthFunc(GL_LEQUAL);
     //glHint(GL_PERSPECTIVE_CORRECTION_HINT, GL_NICEST);
     glClearColor( 0.66f, 0.66f, 0.66f, 1.f );
+
+    //XML TEST
+    SDL_Log("***SVG LOAD***");
+    rapidxml::xml_document<> doc;
+    rapidxml::xml_node<>* root_node;
+    std::ifstream svgFile("assets/ah_natural.svg");
+    std::vector<char> buffer((std::istreambuf_iterator<char>(svgFile)), std::istreambuf_iterator<char>());
+    buffer.push_back('\0');
+
+    doc.parse<0>(&buffer[0]);
+    root_node = doc.first_node("svg");
+    for (rapidxml::xml_node<> * glyph_node = root_node->first_node("defs")->first_node("font")->first_node("glyph"); glyph_node; glyph_node = glyph_node->next_sibling()){
+        SDL_Log("FOUND A GLYPH: %s [%s]",glyph_node->first_attribute("unicode")->value(),parseGlyph(std::string(glyph_node->first_attribute("d")->value())).c_str());
+    }
+
+    //delete root_node;
+    //XML TEST
             
     //Setup input.
     setRawInputProcessor(std::make_shared<MyRawInputProcessor>());
 
     //Fonts
     gel::Asset<gel::FontReference> sans_reg_16 = assets.load<gel::FontReference,gel::Font>("assets/font/OpenSans-Regular.ttf",16);
+
+    //Textures
+    gel::Asset<gel::TextureReference> sphereTexture = assets.load<gel::TextureReference,gel::Texture>("assets/test.jpg");
         
     //Setup shader program.
     std::string prepend = "#version 300 es\n";
@@ -145,10 +184,7 @@ public:
     PhysicsSystem::shapes.push_back(new btSphereShape(1.0f));
     gel::ShapeBuilder::buildSphere(vertices,indices,2,2,2,20,20);
     gel::Asset<gel::VertexReference> groundVertex, sphereVertex = assets.load<gel::VertexReference,gel::Vertex>(
-            std::vector<gel::VertexSpec>{
-                gel::VertexSpec(GL_FLOAT,3,"a_position"),
-                gel::VertexSpec(GL_FLOAT,2,"a_texCoord0")
-            },vertices,indices).assign(texShader);
+            std::vector<gel::VertexSpec>{gel::POSITION,gel::TEXTURE_0},vertices,indices).assign(texShader);
     
     //Create ground.
     std::vector<float> obstructions[] = {
@@ -163,19 +199,15 @@ public:
         std::vector<float>{5.0f, -10.0f, 5.0f,
             50.0f, 2.0f, 50.0f}                             
     };
-
-    gel::Asset<gel::TextureReference> obsTexture = assets.load<gel::TextureReference,gel::Texture>("Open Sans Regular").assign(sans_reg_16);
-    gel::Asset<gel::TextureReference> sphereTexture = assets.load<gel::TextureReference,gel::Texture>("assets/test.jpg");
     
+    //Load obstructions.
     for(std::vector<float> obstruction:obstructions){
         //Build vertex.
         std::vector<GLfloat> tempvertices = std::vector<GLfloat>();
         std::vector<GLuint> tempindices = std::vector<GLuint>();
         gel::ShapeBuilder::buildBox(tempvertices,tempindices,obstruction[3],obstruction[4],obstruction[5]);
-        groundVertex = assets.load<gel::VertexReference,gel::Vertex>(std::vector<gel::VertexSpec>{
-            gel::VertexSpec(GL_FLOAT,3,"a_position"),
-            gel::VertexSpec(GL_FLOAT,2,"a_texCoord0")
-        },tempvertices,tempindices).assign(texShader);
+        groundVertex = assets.load<gel::VertexReference,gel::Vertex>(std::vector<gel::VertexSpec>{gel::POSITION,gel::TEXTURE_0},tempvertices,tempindices)
+                        .assign(texShader);
         
         //Build ground entity.
         PhysicsSystem::shapes.push_back(new btBoxShape(btVector3(obstruction[3] / 2.0f,obstruction[4] / 2.0f,obstruction[5] / 2.0f)));
@@ -186,6 +218,7 @@ public:
             .assign(texShader).assign(groundVertex).assign(sphereTexture);
     }
     
+    //Load spheres.
     std::stringstream sstream(fileToString("assets/cube-drop.txt"));
     int count = 0;
     float x,y,z;
@@ -201,20 +234,7 @@ public:
     }
 
     //Build UI elements.
-    float width = 110.0f,height = 40.0f;
-    std::vector<GLfloat> uiVerts = std::vector<GLfloat>{
-        -0.5f * width, -0.5f * height,  -1.0f, 0,0,
-         0.5f * width, -0.5f * height,  -1.0f, 1,0,
-         0.5f * width,  0.5f * height,  -1.0f, 1,1,
-        -0.5f * width,  0.5f * height,  -1.0f, 0,1};
-    std::vector<GLuint> uiIndices = std::vector<GLuint>{0, 1, 2, 2, 3, 0};
-    gel::Asset<gel::VertexReference> uiVertex = assets.load<gel::VertexReference,gel::Vertex>(
-            std::vector<gel::VertexSpec>{
-                gel::VertexSpec(GL_FLOAT,3,"a_position"),
-                gel::VertexSpec(GL_FLOAT,2,"a_texCoord0")
-            },uiVerts,uiIndices).assign(texShader);
-    assets.load<gel::Mesh>().assign(glm::vec2(100.0f,100.0f)).assign(glm::vec4(1.0f,1.0f,1.0f,1.0f))
-        .assign(texShader).assign(uiVertex).assign(obsTexture);
+    UIBuilder::addText("Test UI Element",glm::vec2(0.0f,0.0f),glm::vec2(RenderSystem::cam.width*0.25f,RenderSystem::cam.height*0.15f),sans_reg_16,texShader,assets);
     return true;
  }
 
