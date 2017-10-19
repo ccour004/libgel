@@ -1,0 +1,13 @@
+Ubuntu 17.04 (32/64 bit)
+
+Tools needed:
+-------------
+-git
+-cmake
+
+Libraries needed:
+-----------------
+-libgl1-mesa-dev
+-libglew-dev
+-libsdl2-image-dev
+-libfreetype6-dev

@@ -66,7 +66,7 @@ ExternalProject_Get_Property(GLM_DL source_dir)
 		ExternalProject_Add(SDL2_ttf_DL 
 			   URL https://www.libsdl.org/projects/SDL_ttf/release/SDL2_ttf-2.0.14.zip
 			   PREFIX SDL2_ttf
-			   CONFIGURE_COMMAND sudo sh /home/ubuntu/git/libgel/libgel_alt/linux-i386/build/SDL2_ttf/src/SDL2_ttf_DL/configure
+			   CONFIGURE_COMMAND sudo sh ${CMAKE_CURRENT_SOURCE_DIR}/build/SDL2_ttf/src/SDL2_ttf_DL/configure
 			   #CONFIGURE_COMMAND sudo sh SDL2_ttf/src/SDL2_ttf_DL/external/freetype-2.4.12/configure 
 			#	COMMAND make -C SDL2_ttf/src/SDL2_ttf_DL/external/freetype-2.4.12
 			#	COMMAND sudo make install -C SDL2_ttf/src/SDL2_ttf_DL/external/freetype-2.4.12
