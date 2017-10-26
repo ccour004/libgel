@@ -1,0 +1,19 @@
+Vagrant.configure("2") do |config|
+  config.vm.define "ubuntu_x64", autostart: false do |ubuntu_x64|
+    ubuntu_x64.vm.box = "ubuntu/zesty64"
+    ubuntu_x64.vm.provision :shell, path: "bootstrap_ubuntu.sh"
+    ubuntu_x64.vm.provider "virtualbox" do |v|
+      v.memory = 3072
+      v.cpus = 2
+    end
+  end
+  config.vm.define "ubuntu_x86", autostart: false do |ubuntu_x86|
+    ubuntu_x86.vm.box = "ubuntu/zesty32"
+    ubuntu_x86.vm.provision :shell, path: "bootstrap_ubuntu.sh"
+    ubuntu_x86.vm.provider "virtualbox" do |v|
+      v.memory = 3072
+      v.cpus = 2
+    end
+  end
+end
+

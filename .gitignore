@@ -8,3 +8,6 @@ Core
 Makefile
 cmake_install.cmake
 build
+external/.vagrant
+external/build
+external/*.log
