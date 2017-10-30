@@ -44,6 +44,8 @@
         "type_traits": "cpp",
         "typeinfo": "cpp",
         "utility": "cpp",
-        "valarray": "cpp"
+        "valarray": "cpp",
+        "algorithm": "cpp",
+        "*.ipp": "cpp"
     }
 }

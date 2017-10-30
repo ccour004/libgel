@@ -29,11 +29,10 @@ SOFTWARE.*/
 #include "helper/UIBuilder.hpp"
 #include "helper/ShapeBuilder.hpp"
 
-#include <iostream>
-#include <fstream>
-#include <vector>
+//#include <fstream>
 #include <rapidxml.hpp>
-//#include "helper/Utility.hpp"
+
+#include "helper/Utility.hpp"
 
 class MyRawInputProcessor: public gel::RawInputProcessor{
 public:
@@ -115,19 +114,6 @@ public:
 
 class MyAppListener: public gel::DefaultAppListener{
 public:
- std::string parseGlyph(std::string data){
-    std::stringstream sstream,output;
-    sstream.str(data);
-    std::string temp;
-    while(sstream){
-        sstream >> temp;
-        if(temp.find("z") == 0) output<<"{END}";
-        if(temp.find("M") == 0 || temp.find("M") == 1) output<<"{POINT START}";
-        else if(temp.find("C") == 0) output<<"{BEZIER CUBIC START}";
-        //else output<<temp<<",";
-    }
-    return output.str();
- }
  bool create(){
     DefaultAppListener::create();
 
@@ -137,23 +123,6 @@ public:
     glDepthFunc(GL_LEQUAL);
     //glHint(GL_PERSPECTIVE_CORRECTION_HINT, GL_NICEST);
     glClearColor( 0.66f, 0.66f, 0.66f, 1.f );
-
-    //XML TEST
-    SDL_Log("***SVG LOAD***");
-    rapidxml::xml_document<> doc;
-    rapidxml::xml_node<>* root_node;
-    std::ifstream svgFile("assets/ah_natural.svg");
-    std::vector<char> buffer((std::istreambuf_iterator<char>(svgFile)), std::istreambuf_iterator<char>());
-    buffer.push_back('\0');
-
-    doc.parse<0>(&buffer[0]);
-    root_node = doc.first_node("svg");
-    for (rapidxml::xml_node<> * glyph_node = root_node->first_node("defs")->first_node("font")->first_node("glyph"); glyph_node; glyph_node = glyph_node->next_sibling()){
-        SDL_Log("FOUND A GLYPH: %s [%s]",glyph_node->first_attribute("unicode")->value(),parseGlyph(std::string(glyph_node->first_attribute("d")->value())).c_str());
-    }
-
-    //delete root_node;
-    //XML TEST
             
     //Setup input.
     setRawInputProcessor(std::make_shared<MyRawInputProcessor>());
@@ -170,7 +139,7 @@ public:
         gel::ShaderSource("assets/default.vert",GL_VERTEX_SHADER,prepend),
         gel::ShaderSource("assets/default.frag",GL_FRAGMENT_SHADER,prepend)
     }),
-    alShader = assets.load<gel::ShaderProgram,gel::ShaderSpec>("alt",std::vector<gel::ShaderSource>{
+    altShader = assets.load<gel::ShaderProgram,gel::ShaderSpec>("alt",std::vector<gel::ShaderSource>{
         gel::ShaderSource("assets/alt.vert",GL_VERTEX_SHADER,prepend),
         gel::ShaderSource("assets/alt.frag",GL_FRAGMENT_SHADER,prepend)
     }),
@@ -178,6 +147,47 @@ public:
         gel::ShaderSource("assets/texTest.vert",GL_VERTEX_SHADER,prepend),
         gel::ShaderSource("assets/texTest.frag",GL_FRAGMENT_SHADER,prepend)
     });
+
+
+    //XML TEST
+    SDL_Log("***SVG LOAD***");
+    glm::vec2 pos = glm::vec2(0,0);
+    rapidxml::xml_document<> doc;
+    rapidxml::xml_node<>* root_node;
+    std::ifstream svgFile("assets/ah_natural.svg");
+    std::vector<char> buffer((std::istreambuf_iterator<char>(svgFile)), std::istreambuf_iterator<char>());
+    buffer.push_back('\0');
+
+    doc.parse<0>(&buffer[0]);
+    std::vector<GLfloat> glyphVertices,polyVerts;
+    std::vector<GLuint> glyphIndices,polyIndices;
+    root_node = doc.first_node("svg");
+    std::vector<GLYPH_SHAPE> shapes;
+
+    for (rapidxml::xml_node<> * glyph_node = root_node->first_node("defs")->first_node("font")->first_node("glyph"); glyph_node; glyph_node = glyph_node->next_sibling()){
+        //SDL_Log("FOUND A GLYPH: %s",glyph_node->first_attribute("unicode")->value());
+        if(std::string(glyph_node->first_attribute("unicode")->value()) == "i" || std::string(glyph_node->first_attribute("unicode")->value()) == "n"
+        || std::string(glyph_node->first_attribute("unicode")->value()) == "t"){
+            shapes = parse_glyph(std::string(glyph_node->first_attribute("d")->value()));
+            for(GLYPH_SHAPE shape:shapes){
+                gel::Asset<gel::VertexReference> glyphVertex = assets.load<gel::VertexReference,gel::Vertex>(
+                    std::vector<gel::VertexSpec>{gel::POSITION},shape.vertices,shape.indices).assign(altShader);
+                assets.load<gel::Mesh>().assign(glm::vec2(pos.x+RenderSystem::cam.width/2.0f,pos.y+RenderSystem::cam.height/2.0f))
+                    .assign(glm::vec4(1.0f,0.0f,0.0f,1.0f)).assign(glyphVertex).assign(altShader).assign((int)shape.vertices.size()/3);
+            }
+            pos.x += std::stof(std::string(glyph_node->first_attribute("horiz-adv-x")->value()));
+        }
+    }
+
+    //Triangulate the glyph's polyline to get something we can render.
+    /*triangulate(polyVerts,glyphVertices,glyphIndices);
+    gel::Asset<gel::VertexReference> glyphVertex = assets.load<gel::VertexReference,gel::Vertex>(
+        std::vector<gel::VertexSpec>{gel::POSITION},glyphVertices,glyphIndices).assign(altShader);
+    assets.load<gel::Mesh>().assign(glm::vec2(pos.x+RenderSystem::cam.width/2.0f,pos.y+RenderSystem::cam.height/2.0f)).assign(glm::vec4(1.0f,0.0f,0.0f,1.0f))
+                .assign(glyphVertex).assign(altShader);*/
+
+    //delete root_node;
+    //XML TEST
     
     //Create sphere.
     std::vector<GLfloat> vertices = std::vector<GLfloat>();
@@ -235,7 +245,7 @@ public:
     }
 
     //Build UI elements.
-    UIBuilder::addText("Test UI Element",glm::vec2(0.0f,0.0f),glm::vec2(RenderSystem::cam.width*0.25f,RenderSystem::cam.height*0.15f),sans_reg_16,texShader,assets);
+    //UIBuilder::addText("Test UI Element",glm::vec2(0.0f,0.0f),glm::vec2(RenderSystem::cam.width*0.25f,RenderSystem::cam.height*0.15f),sans_reg_16,texShader,assets);
     return true;
  }
 
