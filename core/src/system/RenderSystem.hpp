@@ -111,17 +111,17 @@ public:
                     glBindVertexArray(vertex->vao);
                 }
                 SDL_Log("LINE LOOP!");
-                glDrawElements(GL_LINE_STRIP/*GL_LINE_LOOP*/,numPoints,GL_UNSIGNED_INT,0);
+                glDrawElements(/*GL_LINE_STRIP*/GL_LINE_LOOP,numPoints,GL_UNSIGNED_INT,0);
             }
             if(shader) shader->end();
          });         
 
          //2D elements
-         entities.each<gel::Asset<gel::ShaderProgram>,gel::Asset<gel::TextureReference>,gel::Asset<gel::VertexReference>,glm::vec2,glm::vec4>([](entityx::Entity entity,
-            gel::Asset<gel::ShaderProgram>& shaderHandle,gel::Asset<gel::TextureReference>& texHandle,gel::Asset<gel::VertexReference>& vertexHandle,glm::vec2& pos,glm::vec4& color) {
+         entities.each<gel::Asset<gel::ShaderProgram>,/*gel::Asset<gel::TextureReference>,*/gel::Asset<gel::VertexReference>,glm::vec2,glm::vec4>([](entityx::Entity entity,
+            gel::Asset<gel::ShaderProgram>& shaderHandle/*,gel::Asset<gel::TextureReference>& texHandle*/,gel::Asset<gel::VertexReference>& vertexHandle,glm::vec2& pos,glm::vec4& color) {
             entityx::ComponentHandle<gel::ShaderProgram> shader = shaderHandle.component<gel::ShaderProgram>();
             entityx::ComponentHandle<gel::VertexReference> vertex = vertexHandle.component<gel::VertexReference>();
-            entityx::ComponentHandle<gel::TextureReference> texture = texHandle.component<gel::TextureReference>(); 
+            //entityx::ComponentHandle<gel::TextureReference> texture = texHandle.component<gel::TextureReference>(); 
 
             if(shader){
                 shader->begin();
@@ -129,7 +129,7 @@ public:
                 shader->setUniform("u_projView",cam.getOrtho() * glm::translate(glm::mat4(1.0f),glm::vec3(pos.x,pos.y,0.0f)),false);
             }
 
-            if(texture) glBindTexture(GL_TEXTURE_2D,texture->tex);
+            //if(texture) glBindTexture(GL_TEXTURE_2D,texture->tex);
             if(vertex){
                 if(lastVAO != vertex->vao){
                     lastVAO = vertex->vao;

@@ -159,32 +159,34 @@ public:
     buffer.push_back('\0');
 
     doc.parse<0>(&buffer[0]);
-    std::vector<GLfloat> glyphVertices,polyVerts;
-    std::vector<GLuint> glyphIndices,polyIndices;
+    std::vector<GLfloat> glyphVertices,outVertices;
+    std::vector<GLuint> glyphIndices,outIndices;
     root_node = doc.first_node("svg");
     std::vector<GLYPH_SHAPE> shapes;
 
     for (rapidxml::xml_node<> * glyph_node = root_node->first_node("defs")->first_node("font")->first_node("glyph"); glyph_node; glyph_node = glyph_node->next_sibling()){
         //SDL_Log("FOUND A GLYPH: %s",glyph_node->first_attribute("unicode")->value());
-        if(std::string(glyph_node->first_attribute("unicode")->value()) == "i" || std::string(glyph_node->first_attribute("unicode")->value()) == "n"
-        || std::string(glyph_node->first_attribute("unicode")->value()) == "t"){
+        if(std::string(glyph_node->first_attribute("unicode")->value()) == "i" || std::string(glyph_node->first_attribute("unicode")->value()) == "l"
+    || std::string(glyph_node->first_attribute("unicode")->value()) == "t"){
             shapes = parse_glyph(std::string(glyph_node->first_attribute("d")->value()));
             for(GLYPH_SHAPE shape:shapes){
-                gel::Asset<gel::VertexReference> glyphVertex = assets.load<gel::VertexReference,gel::Vertex>(
+                //Polyline Test
+                /*gel::Asset<gel::VertexReference> glyphVertex = assets.load<gel::VertexReference,gel::Vertex>(
                     std::vector<gel::VertexSpec>{gel::POSITION},shape.vertices,shape.indices).assign(altShader);
                 assets.load<gel::Mesh>().assign(glm::vec2(pos.x+RenderSystem::cam.width/2.0f,pos.y+RenderSystem::cam.height/2.0f))
-                    .assign(glm::vec4(1.0f,0.0f,0.0f,1.0f)).assign(glyphVertex).assign(altShader).assign((int)shape.vertices.size()/3);
+                    .assign(glm::vec4(1.0f,0.0f,0.0f,1.0f)).assign(glyphVertex).assign(altShader).assign((int)shape.vertices.size()/3);*/
+
+                //Triangle Test
+                triangulate(shape.vertices,outVertices,outIndices);
+                gel::Asset<gel::VertexReference> glyphVertex = assets.load<gel::VertexReference,gel::Vertex>(
+                    std::vector<gel::VertexSpec>{gel::POSITION},outVertices,outIndices).assign(altShader);
+                assets.load<gel::Mesh>().assign(glm::vec2(pos.x+RenderSystem::cam.width/2.0f,pos.y+RenderSystem::cam.height/2.0f))
+                    .assign(glm::vec4(1.0f,0.0f,0.0f,1.0f)).assign(glyphVertex).assign(altShader);
+                outVertices.clear();outIndices.clear();
             }
             pos.x += std::stof(std::string(glyph_node->first_attribute("horiz-adv-x")->value()));
         }
     }
-
-    //Triangulate the glyph's polyline to get something we can render.
-    /*triangulate(polyVerts,glyphVertices,glyphIndices);
-    gel::Asset<gel::VertexReference> glyphVertex = assets.load<gel::VertexReference,gel::Vertex>(
-        std::vector<gel::VertexSpec>{gel::POSITION},glyphVertices,glyphIndices).assign(altShader);
-    assets.load<gel::Mesh>().assign(glm::vec2(pos.x+RenderSystem::cam.width/2.0f,pos.y+RenderSystem::cam.height/2.0f)).assign(glm::vec4(1.0f,0.0f,0.0f,1.0f))
-                .assign(glyphVertex).assign(altShader);*/
 
     //delete root_node;
     //XML TEST

@@ -87,11 +87,11 @@ void svgGlyphToTriangles(std::vector<GLfloat>& vertices,std::vector<GLuint>& ind
 
 void triangulate(const std::vector<GLfloat>& incoming,std::vector<GLfloat>& outgoing,std::vector<GLuint>& outgoing_indices){
     //Convert points.
-    /*std::vector<p2t::Point*> polyline; 
+    std::vector<p2t::Point*> polyline; 
     SDL_Log("POLYLINE SIZE: %i",incoming.size());
     if(incoming.size() == 0) return;
 
-    for(int i = 0;i < incoming.size();i +=2){
+    for(int i = 0;i < incoming.size();i +=3){
         SDL_Log("POLYLINE POINT: (%f,%f)",incoming[i],incoming[i+1]);
         polyline.push_back(new p2t::Point(incoming[i],incoming[i+1]));
     }
@@ -102,7 +102,6 @@ void triangulate(const std::vector<GLfloat>& incoming,std::vector<GLfloat>& outg
     std::vector<p2t::Triangle*> triangles = cdt->GetTriangles();
 
     //TODO: convert triangles to something we can return
-    int counter = 0;
     for(int i = 0;i < triangles.size();i++){
         p2t::Triangle& t = *triangles[i];
         p2t::Point& a = *t.GetPoint(0);
@@ -112,10 +111,10 @@ void triangulate(const std::vector<GLfloat>& incoming,std::vector<GLfloat>& outg
         outgoing.push_back(b.x);outgoing.push_back(b.y);outgoing.push_back(-1.0f);
         outgoing.push_back(c.x);outgoing.push_back(c.y);outgoing.push_back(-1.0f);
         SDL_Log("GLYPH TRIANGLE: (%f,%f),(%f,%f),(%f,%f)",a.x,a.y,b.x,b.y,c.x,c.y);
-        for(int j = 0;j < 3;j++)outgoing_indices.push_back(counter++);
+        for(int j = 0;j < 3;j++)outgoing_indices.push_back(outgoing_indices.size());
     }
 
     //Clean up.
     delete cdt;
-    polyline.clear();*/
+    polyline.clear();
 }
