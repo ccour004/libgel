@@ -60,36 +60,36 @@ public:
 
     bool touchFingerEvent(const SDL_TouchFingerEvent& event){
         switch(event.type){
-            case SDL_FINGERDOWN: SDL_Log("[SDL_FINGERDOWN]");
+            case SDL_FINGERDOWN: //SDL_Log("[SDL_FINGERDOWN]");
                 RenderSystem::drag = true;
                 break;
-            case SDL_FINGERUP: SDL_Log("[SDL_FINGERUP]");
+            case SDL_FINGERUP: //SDL_Log("[SDL_FINGERUP]");
                 RenderSystem::drag = false;
                 RenderSystem::rotateAmount = 0.0f;
                 break;
-            case SDL_FINGERMOTION: SDL_Log("[SDL_FINGERMOTION]: %f,%f",event.dx,event.dy);
+            case SDL_FINGERMOTION: //SDL_Log("[SDL_FINGERMOTION]: %f,%f",event.dx,event.dy);
                 if(RenderSystem::drag) RenderSystem::rotateAmount += event.dx;
                 break;
         }
         return true;
     }
     bool keyboardEvent(const SDL_KeyboardEvent& event){
-        SDL_Log("[SDL_KEYBOARDEVENT]");
+        //SDL_Log("[SDL_KEYBOARDEVENT]");
         return true;
     }
 
     bool mouseMotionEvent(const SDL_MouseMotionEvent& event){
-        SDL_Log("[SDL_MOUSEMOTIONEVENT]: %i,%i",event.xrel,event.yrel);
+        //SDL_Log("[SDL_MOUSEMOTIONEVENT]: %i,%i",event.xrel,event.yrel);
         if(RenderSystem::drag) RenderSystem::rotateAmount += event.xrel;
         return true;
     }
     
     bool mouseButtonEvent(const SDL_MouseButtonEvent& event){
         switch(event.type){
-            case SDL_MOUSEBUTTONDOWN: SDL_Log("[SDL_MOUSEBUTTONDOWN]: %i,%i",event.x,event.y);
+            case SDL_MOUSEBUTTONDOWN: //SDL_Log("[SDL_MOUSEBUTTONDOWN]: %i,%i",event.x,event.y);
                 RenderSystem::drag = true;
                 break; 
-            case SDL_MOUSEBUTTONUP: SDL_Log("[SDL_MOUSEBUTTONUP]");
+            case SDL_MOUSEBUTTONUP: //SDL_Log("[SDL_MOUSEBUTTONUP]");
                 RenderSystem::drag = false;
                 RenderSystem::rotateAmount = 0.0f;
                 break;
@@ -98,14 +98,14 @@ public:
     }
     
     bool mouseWheelEvent(const SDL_MouseWheelEvent& event){
-        SDL_Log("[SDL_MOUSEWHEELEVENT]: %i",event.y);
+        //SDL_Log("[SDL_MOUSEWHEELEVENT]: %i",event.y);
         RenderSystem::x -= event.y;
         RenderSystem::eye = ((float)glm::clamp(RenderSystem::x,1,72)) * glm::normalize(RenderSystem::eye);
         return true;
     }
     
     bool multiGestureEvent(const SDL_MultiGestureEvent& event){
-        SDL_Log("[SDL_MULTIGESTUREEVENT]: %f",event.dDist);
+       // SDL_Log("[SDL_MULTIGESTUREEVENT]: %f",event.dDist);
         RenderSystem::x -= event.dDist;
         RenderSystem::eye = ((float)glm::clamp(RenderSystem::x,1,72)) * glm::normalize(RenderSystem::eye);
         return true;
@@ -121,6 +121,7 @@ public:
     glEnable(GL_DEPTH_TEST);
     glClearDepthf(1.0f);
     glDepthFunc(GL_LEQUAL);
+    //glLineWidth(3.0f);
     //glHint(GL_PERSPECTIVE_CORRECTION_HINT, GL_NICEST);
     glClearColor( 0.66f, 0.66f, 0.66f, 1.f );
             
@@ -148,48 +149,42 @@ public:
         gel::ShaderSource("assets/texTest.frag",GL_FRAGMENT_SHADER,prepend)
     });
 
-
-    //XML TEST
-    SDL_Log("***SVG LOAD***");
-    glm::vec2 pos = glm::vec2(0,0);
-    rapidxml::xml_document<> doc;
-    rapidxml::xml_node<>* root_node;
-    std::ifstream svgFile("assets/ah_natural.svg");
-    std::vector<char> buffer((std::istreambuf_iterator<char>(svgFile)), std::istreambuf_iterator<char>());
-    buffer.push_back('\0');
-
-    doc.parse<0>(&buffer[0]);
+    //Freetype TEST
+    glm::vec2 pos = glm::vec2(0/*-RenderSystem::cam.width/2.0f*/,0);
     std::vector<GLfloat> glyphVertices,outVertices;
     std::vector<GLuint> glyphIndices,outIndices;
-    root_node = doc.first_node("svg");
-    std::vector<GLYPH_SHAPE> shapes;
+    gel::Asset<gel::VertexReference> glyphVertex;
+    float scale = 0.05f;
+    glm::vec2 final_pos = glm::vec2(pos.x/*+RenderSystem::cam.width/2.0f*/,pos.y+RenderSystem::cam.height/2.0f+65.0f);
 
-    for (rapidxml::xml_node<> * glyph_node = root_node->first_node("defs")->first_node("font")->first_node("glyph"); glyph_node; glyph_node = glyph_node->next_sibling()){
-        //SDL_Log("FOUND A GLYPH: %s",glyph_node->first_attribute("unicode")->value());
-        if(std::string(glyph_node->first_attribute("unicode")->value()) == "i" || std::string(glyph_node->first_attribute("unicode")->value()) == "l"
-    || std::string(glyph_node->first_attribute("unicode")->value()) == "t"){
-            shapes = parse_glyph(std::string(glyph_node->first_attribute("d")->value()));
-            for(GLYPH_SHAPE shape:shapes){
-                //Polyline Test
-                /*gel::Asset<gel::VertexReference> glyphVertex = assets.load<gel::VertexReference,gel::Vertex>(
-                    std::vector<gel::VertexSpec>{gel::POSITION},shape.vertices,shape.indices).assign(altShader);
-                assets.load<gel::Mesh>().assign(glm::vec2(pos.x+RenderSystem::cam.width/2.0f,pos.y+RenderSystem::cam.height/2.0f))
-                    .assign(glm::vec4(1.0f,0.0f,0.0f,1.0f)).assign(glyphVertex).assign(altShader).assign((int)shape.vertices.size()/3);*/
+    std::string s = "lazy dog";
 
-                //Triangle Test
-                triangulate(shape.vertices,outVertices,outIndices);
-                gel::Asset<gel::VertexReference> glyphVertex = assets.load<gel::VertexReference,gel::Vertex>(
-                    std::vector<gel::VertexSpec>{gel::POSITION},outVertices,outIndices).assign(altShader);
-                assets.load<gel::Mesh>().assign(glm::vec2(pos.x+RenderSystem::cam.width/2.0f,pos.y+RenderSystem::cam.height/2.0f))
-                    .assign(glm::vec4(1.0f,0.0f,0.0f,1.0f)).assign(glyphVertex).assign(altShader);
-                outVertices.clear();outIndices.clear();
-            }
-            pos.x += std::stof(std::string(glyph_node->first_attribute("horiz-adv-x")->value()));
-        }
+    std::vector<wchar_t> letters(s.c_str(), s.c_str() + s.length());
+    FT_Library library;
+    int error = FT_Init_FreeType(&library);
+    if(error)SDL_Log("FT Init Error!");
+    else SDL_Log("FT Init OK!");
+    for(wchar_t letter:letters)if(letter != ' '){
+        float advance = freetype_test(letter,library,"assets/ah_natural.ttf",glyphVertices,glyphIndices,scale,false);
+
+        //Polyline Test
+        glyphVertex = assets.load<gel::VertexReference,gel::Vertex>(
+            std::vector<gel::VertexSpec>{gel::POSITION},glyphVertices,glyphIndices).assign(altShader);
+        assets.load<gel::Mesh>().assign(final_pos)
+            .assign(glm::vec4(0.0f,0.0f,0.0f,1.0f)).assign(glyphVertex).assign(altShader).assign((int)glyphVertices.size());
+
+        //Triangle Test
+        /*triangulate(glyphVertices,outVertices,outIndices);
+        glyphVertex = assets.load<gel::VertexReference,gel::Vertex>(
+            std::vector<gel::VertexSpec>{gel::POSITION},outVertices,outIndices).assign(altShader);
+        assets.load<gel::Mesh>().assign(final_pos)
+            .assign(glm::vec4(1.0f,0.0f,0.0f,1.0f)).assign(glyphVertex).assign(altShader);*/
+        outVertices.clear();outIndices.clear();glyphVertices.clear();glyphIndices.clear();
+
+        final_pos.x += advance * .001f;
     }
-
-    //delete root_node;
-    //XML TEST
+    FT_Done_FreeType(library);
+    //Freetype TEST
     
     //Create sphere.
     std::vector<GLfloat> vertices = std::vector<GLfloat>();

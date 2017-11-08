@@ -129,6 +129,12 @@ else()
 	    include_directories(${GLEW_INCLUDE_DIRS})
 	endif()
 
+	#FREETYPE
+	find_package(Freetype)
+	if(FREETYPE_FOUND)
+	    include_directories(${FREETYPE_INCLUDE_DIRS})
+	endif()
+
 	##HEADER ONLY
 	include_directories(${EXTERNAL}/GLM/src/GLM_DL) #GLM
 	include_directories(${EXTERNAL}/XML/src/XML_DL) #RapidXML
@@ -173,7 +179,7 @@ else()
 	aux_source_directory(${EXTERNAL}/P2T/src/P2T_DL/poly2tri/common P2T_COMMON)
 	add_executable(Core ${P2T_COMMON} ${P2T_SWEEP} ${SOURCE})
 	include_directories(core/src)
-        target_link_libraries(Core ${OPENGL_LIBRARIES} ${GLEW_LIBRARIES} SDL2 SDL2_image SDL2_ttf
+        target_link_libraries(Core ${OPENGL_LIBRARIES} ${GLEW_LIBRARIES} ${FREETYPE_LIBRARIES} SDL2 SDL2_image SDL2_ttf
 		linearMath common collision dynamics entityx)
 endif()
 

@@ -24,6 +24,11 @@ SOFTWARE.*/
 
 #include <vector>
 #include <poly2tri/poly2tri.h>
+#include <glm/gtc/epsilon.hpp>
+
+#include <ft2build.h>
+#include FT_FREETYPE_H
+#include FT_STROKER_H
 
 #define CUBIC_BEZIER_BEST 100
 #define CUBIC_BEZIER_FAST 10
@@ -34,66 +39,222 @@ glm::vec2 cubic_bezier(glm::vec2 p0,glm::vec2 p1,glm::vec2 p2,glm::vec2 p3,float
     glm::vec2 part1 = (a * p0) + (b * p1),part2 = (c * p2),part3 = (d * p3);
     return part1 + part2 + part3;
 }
-void cubic_bezier_range(glm::vec2 p0,glm::vec2 p1,glm::vec2 p2,glm::vec2 p3,std::vector<GLfloat>& vertices,std::vector<GLuint>& indices,float numPoints){
-    float t_increment = 1.0f / numPoints;
-    for(float t = 0.0f;t < 1.0f/**/-t_increment/**/;t += t_increment){
-        glm::vec2 pt = cubic_bezier(p0,p1,p2,p3,t);
-        vertices.push_back(pt.x);vertices.push_back(pt.y);vertices.push_back(-1.0f);
-        indices.push_back(indices.size());
-    }  
+
+glm::vec2 quadratic_bezier(glm::vec2 p0,glm::vec2 p1,glm::vec2 p2,float t){
+    float poly = 1.0f - t,poly2 = pow(poly,2.0f),t2 = pow(t,2.0f);
+    glm::vec2 part1 = p0 * poly2,part2 = 2 * poly * t * p1,part3 = t2 * p2;
+    return part1 + part2 + part3;
 }
-struct GLYPH_SHAPE{
-    std::vector<GLfloat> vertices;
-    std::vector<GLuint> indices;
-    float px,py;
-    void point(float px,float py){this->px = px;this->py = py;}
-    void bezier(float c1x,float c1y,float c2x,float c2y,float endx,float endy){
-        cubic_bezier_range(glm::vec2(px,py),glm::vec2(c1x,c1y),
-            glm::vec2(c2x,c2y),glm::vec2(endx,endy),vertices,indices,CUBIC_BEZIER_BEST);
-        px = endx; py = endy;
-    }
-    void clear(){vertices.clear();indices.clear();}
+
+struct GLYPH_LINE{
+    GLYPH_LINE(glm::vec2 start,glm::vec2 end):start(start),end(end),slope(end-start){}
+    glm::vec2 start,end,slope;
 };
-std::vector<GLYPH_SHAPE> parse_glyph(std::string data){
-    std::stringstream sstream;
-    sstream.str(data);
-    std::string temp[6];
-    std::vector<GLYPH_SHAPE> shapes;
-    GLYPH_SHAPE shape;
-    while(sstream){
-        sstream >> temp[0];
-        //Close line.
-        if(temp[0][0] == 'z'){
-            shapes.push_back(shape);
-            shape.clear();
-        }
-        //Move To - starting point.
-        if(temp[0][0] == 'M' || temp[0][1] == 'M'){
-            sstream >> temp[1];
-            shape.point(std::stof(temp[0].substr(temp[0].find("M")+1)),-std::stof(temp[1]));
-        }
-        //Cubic Bezier curve.
-        else if(temp[0][0] == 'C'){
-            sstream >> temp[1] >> temp[2] >> temp[3] >> temp[4] >> temp[5];
-            shape.bezier(std::stof(temp[0].substr(temp[0].find("C")+1)),-std::stof(temp[1]),std::stof(temp[2]),
-                -std::stof(temp[3]),std::stof(temp[4]),-std::stof(temp[5]));
+glm::vec2 line_intersect_params(GLYPH_LINE l1,GLYPH_LINE l2){
+    glm::vec2 a = l1.start,b = l1.slope,c = l2.start,d = l2.slope;
+    return glm::vec2((d.x * (a.y-c.y) +d.y * (c.x-a.x))/(b.x*d.y-b.y*d.x),
+        (b.x * (c.y-a.y) +b.y * (a.x-c.x))/(d.x*b.y-d.y*b.x));  
+}
+
+glm::vec2 pt;
+std::vector<GLYPH_LINE> lines;
+
+int move_to (const FT_Vector* to,void* user){
+    pt = glm::vec2(to->x,to->y);
+    //SDL_Log("MOVE TO: %ld,%ld",to->x,to->y);
+    return 0;
+}
+
+int line_to(const FT_Vector* to,void* user)
+{
+    lines.push_back(GLYPH_LINE(glm::vec2(pt.x,pt.y),
+        glm::vec2(to->x ,to->y)));
+    pt = glm::vec2(to->x,to->y);
+   //SDL_Log("LINE TO: %ld,%ld",to->x,to->y);
+    return 0;
+}
+
+int conic_to(const FT_Vector* control,const FT_Vector* to,void* user){
+    glm::vec2 p0 = glm::vec2(pt.x,pt.y),p1 = glm::vec2(control->x,control->y),p2 = glm::vec2(to->x ,to->y),lastPt = p0;
+    float numPoints = CUBIC_BEZIER_BEST,t_increment = 1.0f / numPoints;
+    for(float t = 0.0f;t <= 1.0f;t += t_increment){
+        glm::vec2 pt = quadratic_bezier(p0,p1,p2,t);
+        lines.push_back(GLYPH_LINE(lastPt,pt));
+        lastPt = pt;
+    }
+    pt = glm::vec2(to->x,to->y);
+    //SDL_Log("CONIC TO: %ld,%ld, with CONTROL1: %ld,%ld",to->x,to->y,control->x,control->y);
+    return 0;
+}
+
+int cubic_to(const FT_Vector* control1,const FT_Vector* control2,const FT_Vector* to,void* user){
+    glm::vec2 p0 = glm::vec2(pt.x,pt.y),p1 = glm::vec2(control1->x,control1->y),
+        p2 = glm::vec2(control2->x,control2->y),p3 = glm::vec2(to->x ,to->y),lastPt = p0;
+    float numPoints = CUBIC_BEZIER_BEST,t_increment = 1.0f / numPoints;
+    for(float t = 0.0f;t < 1.0f;t += t_increment){
+        glm::vec2 pt = cubic_bezier(p0,p1,p2,p3,t);
+        lines.push_back(GLYPH_LINE(lastPt,pt));
+        lastPt = pt;
+    }
+    pt = glm::vec2(to->x,to->y);
+    //SDL_Log("CUBIC TO: %ld,%ld, with CONTROL1: %ld,%ld and CONTROL 2: %ld,%ld",to->x,to->y,control1->x,control1->y,control2->x,control2->y);
+    return 0;
+}
+
+/*std::vector<std::vector<GLYPH_LINE>>*/void removeLoopsAndGetHoles(std::vector<GLYPH_LINE>& lines,bool fill_right){
+    std::vector<std::vector<GLYPH_LINE>> holes;
+    for(int i = 0;i < lines.size();i++)
+    for(int j = 0;j < i;j++){
+        glm::vec2 params = line_intersect_params(lines[i],lines[j]);
+        if(params.x > 0.0f && params.x < 1.0f && params.y > 0.0f && params.y < 1.0f){
+            glm::vec2 a = lines[i].start + params.x * lines[i].slope,b = lines[j].end,c = lines[i].start,
+                d = b - a,e = c - a;
+            //CW winding result for fill_right, CCW otherwise, will indicate the presence of a loop.
+            float winding_result = glm::cross(glm::vec3(d.x,d.y,0),glm::vec3(e.x,e.y,0)).z;
+            if((winding_result > 0.0f && !fill_right) || (winding_result < 0.0f && fill_right)){
+                lines[i].end = a;
+                lines[j].start = a;
+                lines.erase(lines.begin()+j+1,lines.begin()+i);
+            }else{ //If it isn't a loop, then it's a hole.
+                //TODO: Remove hole, but add its points to the holes vector for triangulation later.
+            }
         }
     }
-    return shapes;
- }
-void svgGlyphToTriangles(std::vector<GLfloat>& vertices,std::vector<GLuint>& indices){
-    //TODO: take in a glyph, pull out points, bezier curves, etc.,triangulate the resulting polyline, and return triangles/indices
+    //return holes;
+}
+
+std::vector<GLYPH_LINE> getScanlines(std::vector<GLYPH_LINE>& lines,bool fill_right){
+    std::vector<GLYPH_LINE> scanlines;
+    float increment = 0.1f/*0.5f*/,scanline_length = 999.0f;
+
+    for(int i = 0;i < lines.size();i++)
+    for(float t = 0.0f;t <= 1.0f;t += increment){
+        glm::vec2 vec = lines[i].end - lines[i].start,
+            ortho = fill_right ? glm::vec2(vec.y,-vec.x) : glm::vec2(-vec.y,vec.x);
+        float smallestT = FLT_MAX;
+        GLYPH_LINE ortho_line = GLYPH_LINE(lines[i].start + lines[i].slope * t,lines[i].start + lines[i].slope * t + ortho * scanline_length);
+        for(int j = 0;j < lines.size();j++)
+        if(i != j){
+            glm::vec2 params = line_intersect_params(ortho_line,lines[j]);
+            if(params.x >= 0.0f && params.x <= 1.0f && params.x < smallestT && params.y >= 0.0f && params.y <= 1.0f)
+                smallestT = params.x;
+        }
+        if(smallestT < FLT_MAX) {
+            GLYPH_LINE new_scanline = GLYPH_LINE(ortho_line.start,ortho_line.start + ortho_line.slope * smallestT);
+            //Clip any potential stray lines.
+            float subT = smallestT;
+            for(int k = 0;k < lines.size();k++){
+                glm::vec2 params = line_intersect_params(new_scanline,lines[k]);
+                if(params.x >= 0.0f && params.x <= 1.0f && params.x < subT && params.y >= 0.0f && params.y <= 1.0f)
+                subT = params.x;
+            }
+            scanlines.push_back(GLYPH_LINE(ortho_line.start,ortho_line.start + ortho_line.slope * subT));
+        }
+    }
+    return scanlines;
+}
+
+float freetype_test(wchar_t ch,FT_Library& library,std::string filename,std::vector<GLfloat>& vertices,std::vector<GLuint>& indices,float scale,bool loop_remove){
+    // Initialize FreeType.
+    float advance = 0.0f;
+
+    // Open up a font file.
+    std::ifstream fontFile(filename.c_str(), std::ios::binary);
+    if (fontFile)
+    {
+        // Read the entire file to a memory buffer.
+        fontFile.seekg(0, std::ios::end);
+        std::fstream::pos_type fontFileSize = fontFile.tellg();
+        fontFile.seekg(0);
+        unsigned char *fontBuffer = new unsigned char[fontFileSize];
+        fontFile.read((char *)fontBuffer, fontFileSize);
+
+        // Create a face for loading/filling glyph info.
+        FT_Face face;
+        FT_New_Memory_Face(library, fontBuffer, fontFileSize, 0, &face);
+
+        int size = 100;
+        // Set the size to use.
+        if (FT_Set_Char_Size(face, size << 6, size << 6, 90, 90) == 0)
+        {
+            // Load the glyph we are looking for (need an outline for this to work).
+            FT_UInt gindex = FT_Get_Char_Index(face, ch);
+            if (FT_Load_Glyph(face, gindex, FT_LOAD_NO_BITMAP) == 0 && face->glyph->format == FT_GLYPH_FORMAT_OUTLINE)
+            {
+                FT_Glyph glyph;           
+                if (FT_Get_Glyph(face->glyph, &glyph) == 0 && glyph->format == FT_GLYPH_FORMAT_OUTLINE)
+                {
+                    advance = (float)glyph->advance.x * scale;
+                    SDL_Log("Horiz adv: %f",advance);
+                    FT_Outline *o = &reinterpret_cast<FT_OutlineGlyph>(glyph)->outline;
+
+                    //Decompose outline.
+                    FT_Outline_Funcs* outline_funcs = new FT_Outline_Funcs;
+                    outline_funcs->move_to = move_to;
+                    outline_funcs->line_to = line_to;
+                    outline_funcs->conic_to = conic_to;
+                    outline_funcs->cubic_to = cubic_to;
+                    outline_funcs->shift = 0;outline_funcs->delta = 0;
+                    FT_Outline_Decompose(o,outline_funcs,NULL);
+                    delete outline_funcs;
+
+                    //Orientation for filling.
+                    FT_Orientation orientation = FT_Outline_Get_Orientation(o);
+                    bool fill_right = true;
+                    switch(orientation){
+                        case FT_ORIENTATION_FILL_RIGHT:SDL_Log("FILL RIGHT!");break;
+                        case FT_ORIENTATION_FILL_LEFT:SDL_Log("FILL LEFT!");fill_right = false; break;
+                        case FT_ORIENTATION_NONE:SDL_Log("FILL UNKNOWN!");break;
+                    }
+
+                    //Scanlines
+                    //removeLoopsAndGetHoles(lines,fill_right);
+                    lines.erase(lines.begin());
+                    SDL_Log("NUM LINES: %li",lines.size());
+                    int counter = 0;
+                    for(GLYPH_LINE line:getScanlines(lines,fill_right)/*lines*/){
+                        vertices.push_back(line.start.x * scale);
+                        vertices.push_back(line.start.y * -scale);
+                        vertices.push_back(-1.0f);
+                        indices.push_back(indices.size());
+                        vertices.push_back(line.end.x  * scale);
+                        vertices.push_back(line.end.y * -scale);
+                        vertices.push_back(-1.0f);
+                        indices.push_back(indices.size());
+                        //SDL_Log("PUSH LINE: (%f,%f) to (%f,%f)",line.start.x * scale,line.start.y * -scale,
+                        //    line.end.x * scale,line.end.y * -scale);
+                        counter++;
+                    }
+                    SDL_Log("NUM SCAN LINES: %i",counter);
+                    lines.clear();
+                }
+            }
+        }
+        delete [] fontBuffer;       
+    }
+    return advance;
 }
 
 void triangulate(const std::vector<GLfloat>& incoming,std::vector<GLfloat>& outgoing,std::vector<GLuint>& outgoing_indices){
     //Convert points.
     std::vector<p2t::Point*> polyline; 
-    SDL_Log("POLYLINE SIZE: %i",incoming.size());
+    SDL_Log("POLYLINE SIZE: %li",incoming.size());
     if(incoming.size() == 0) return;
 
+    std::vector<float> x,y;
     for(int i = 0;i < incoming.size();i +=3){
-        SDL_Log("POLYLINE POINT: (%f,%f)",incoming[i],incoming[i+1]);
-        polyline.push_back(new p2t::Point(incoming[i],incoming[i+1]));
+        //SDL_Log("POLYLINE POINT: (%f,%f)",incoming[i],incoming[i+1]);
+        if(std::find(x.begin(),x.end(),incoming[i]) != x.end() &&
+        std::find(y.begin(),y.end(),incoming[i+1]) != y.end()) {
+            SDL_Log("<<POINT EXISTS!>>");//return;
+            //x.push_back(incoming[i]);
+            //y.push_back(incoming[i+1]);
+            //polyline.push_back(new p2t::Point(incoming[i],incoming[i+1]));
+        }else{
+            x.push_back(incoming[i]);
+            y.push_back(incoming[i+1]);
+            polyline.push_back(new p2t::Point(incoming[i],incoming[i+1]));
+        }
     }
 
     //Triangulate.
@@ -110,7 +271,7 @@ void triangulate(const std::vector<GLfloat>& incoming,std::vector<GLfloat>& outg
         outgoing.push_back(a.x);outgoing.push_back(a.y);outgoing.push_back(-1.0f);
         outgoing.push_back(b.x);outgoing.push_back(b.y);outgoing.push_back(-1.0f);
         outgoing.push_back(c.x);outgoing.push_back(c.y);outgoing.push_back(-1.0f);
-        SDL_Log("GLYPH TRIANGLE: (%f,%f),(%f,%f),(%f,%f)",a.x,a.y,b.x,b.y,c.x,c.y);
+        //SDL_Log("GLYPH TRIANGLE: (%f,%f),(%f,%f),(%f,%f)",a.x,a.y,b.x,b.y,c.x,c.y);
         for(int j = 0;j < 3;j++)outgoing_indices.push_back(outgoing_indices.size());
     }
 
