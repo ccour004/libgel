@@ -134,7 +134,7 @@ public:
                     lastVAO = vertex->vao;
                     glBindVertexArray(vertex->vao);
                 }
-                glDrawElements(/*GL_LINE_LOOP*/GL_LINES,numPoints,GL_UNSIGNED_INT,0);
+                glDrawElements(/*GL_LINES*/GL_LINE_LOOP,numPoints,GL_UNSIGNED_INT,0);
             }
             if(shader) shader->end();
          });         

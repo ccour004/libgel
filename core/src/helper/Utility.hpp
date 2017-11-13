@@ -37,7 +37,7 @@ int leftCell(int x,int range,int width,int height){
 }
 
 int rightCell(int x,int range,int width,int height){
-    if(x + range >= width * height * range || x % width + range > width) return - 1;
+    if(x + range >= width * height * range || x % width + range >= width) return - 1;
     return x + range;   
 }
 
@@ -58,7 +58,7 @@ int upLeftCell(int x,int range,int width,int height){
 }
 int upRightCell(int x,int range,int width,int height){
     if(x - width < 0) return -1;
-    if(x + range >= width * height * range || x % width + range > width) return - 1;
+    if(x + range >= width * height * range || x % width + range >= width) return - 1;
     return x - width + range;
 }
 int downLeftCell(int x,int range,int width,int height){
@@ -68,7 +68,7 @@ int downLeftCell(int x,int range,int width,int height){
 }
 int downRightCell(int x,int range,int width,int height){
     if(x + width >= width * height * range) return -1;
-    if(x + range >= width * height * range || x % width + range > width) return - 1;
+    if(x + range >= width * height * range || x % width + range >= width) return - 1;
     return x + width + range;
 }
 
@@ -124,7 +124,7 @@ std::vector<glm::vec2> findOutlineVertices(int width,int height,unsigned char* b
 }
 
 float freetype_test(wchar_t ch,FT_Library& library,std::string filename,
-        std::vector<GLfloat>& line_vertices,std::vector<GLuint>& line_indices,
+        std::vector<GLfloat>& line_vertices,std::vector<GLuint>& line_indices,std::vector<std::vector<GLfloat>>& holes,
         float scale,bool loop_remove){
     // Initialize FreeType.
     float advance = 0.0f;
@@ -174,27 +174,42 @@ float freetype_test(wchar_t ch,FT_Library& library,std::string filename,
                         else {buffer.push_back(0xFF);buffer.push_back(0xFF);buffer.push_back(0xFF);}
                     }
 
-                   /* std::ofstream outfile;
+                    /**TEMP**/
+                    std::ofstream outfile;
                     std::vector<char> name; name.push_back((char)ch);
                     outfile.open("f.bin",std::ios::out | std::ios::binary | std::ios::trunc);
                     outfile.write((const char*)buffer.data(),buffer.size());
-                    outfile.close();*/
+                    outfile.close();
+                    /**TEMP**/
 
                     //Find outline vertices.
                     std::vector<glm::vec2> outline_vertices = findOutlineVertices(bitmap->width,bitmap->rows,bitmap->buffer,remaining);
-                    std::vector<std::vector<glm::vec2>> holes;
-                    while(remaining.size() > 0) holes.push_back(findOutlineVertices(bitmap->width,bitmap->rows,bitmap->buffer,remaining));
+                    //std::reverse(outline_vertices.begin(),outline_vertices.end());
+                    std::vector<std::vector<glm::vec2>> temp_holes;
+                    while(remaining.size() > 0) temp_holes.push_back(findOutlineVertices(bitmap->width,bitmap->rows,bitmap->buffer,remaining));
                                     
-                    SDL_Log("Outline vertices done! Found %i vertices and %i holes.",outline_vertices.size(),holes.size());
+                    SDL_Log("Outline vertices done! Found %i vertices and %i holes.",outline_vertices.size(),temp_holes.size());
                     for(int i = 0;i < outline_vertices.size();i++){
                         line_vertices.push_back(outline_vertices[i].x * scale);
                         line_vertices.push_back(outline_vertices[i].y * scale);
                         line_vertices.push_back(-1.0f);
                         line_indices.push_back(line_indices.size());
-                        /*line_vertices.push_back(outline_vertices[i+1].x  * scale);
-                        line_vertices.push_back(outline_vertices[i+1].y * scale);
-                        line_vertices.push_back(-1.0f);
-                        line_indices.push_back(line_indices.size());*/
+                    }
+                    for(std::vector<glm::vec2> hole:temp_holes){
+                        SDL_Log("HOLE SIZE: %i",hole.size());
+                        std::vector<GLfloat> hole_vertices;
+                        /**TEMP**/
+                        if(hole.size() >= 10){
+                        /**TEMP**/
+                        for(int i = 0;i < hole.size();i++){
+                            hole_vertices.push_back(hole[i].x * scale);
+                            hole_vertices.push_back(hole[i].y * scale);
+                            hole_vertices.push_back(-1.0f);
+                        }
+                        holes.push_back(hole_vertices);
+                        /**TEMP**/
+                         }
+                        /**TEMP**/
                     }
                 }
             }
@@ -204,12 +219,14 @@ float freetype_test(wchar_t ch,FT_Library& library,std::string filename,
     return advance;
 }
 
-void triangulate(const std::vector<GLfloat>& incoming,std::vector<GLfloat>& outgoing,std::vector<GLuint>& outgoing_indices){
+void triangulate(const std::vector<GLfloat>& incoming,const std::vector<std::vector<GLfloat>>& holes,
+    std::vector<GLfloat>& outgoing,std::vector<GLuint>& outgoing_indices){
     //Convert points.
     std::vector<p2t::Point*> polyline; 
     SDL_Log("POLYLINE SIZE: %li",incoming.size()/3);
     if(incoming.size() == 0) return;
 
+    //Add outline as polyline.
     std::vector<float> x,y;
     for(int i = 0;i < incoming.size();i +=3){
         //SDL_Log("POLYLINE POINT: (%f,%f)",incoming[i],incoming[i+1]);
@@ -225,13 +242,22 @@ void triangulate(const std::vector<GLfloat>& incoming,std::vector<GLfloat>& outg
             polyline.push_back(new p2t::Point(incoming[i],incoming[i+1]));
         }
     }
+    p2t::CDT* cdt = new p2t::CDT(polyline);
+
+    //Add holes.
+    for(std::vector<GLfloat> hole:holes){
+        std::vector<p2t::Point*> holePoints;
+        for(int i = 0;i < hole.size();i +=3){
+            holePoints.push_back(new p2t::Point(hole[i],hole[i+1]));
+        }
+        cdt->AddHole(holePoints);       
+    }
 
     //Triangulate.
-    p2t::CDT* cdt = new p2t::CDT(polyline);
     cdt->Triangulate();
     std::vector<p2t::Triangle*> triangles = cdt->GetTriangles();
 
-    //TODO: convert triangles to something we can return
+    //Convert triangles to something we can return.
     for(int i = 0;i < triangles.size();i++){
         p2t::Triangle& t = *triangles[i];
         p2t::Point& a = *t.GetPoint(0);

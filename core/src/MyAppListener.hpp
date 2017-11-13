@@ -152,12 +152,13 @@ public:
     //Freetype TEST
     glm::vec2 pos = glm::vec2(0/*-RenderSystem::cam.width/2.0f*/,0);
     std::vector<GLfloat> glyphVertices,scanlineVertices,outVertices;
+    std::vector<std::vector<GLfloat>> holes;
     std::vector<GLuint> glyphIndices,scanlineIndices,outIndices;
     gel::Asset<gel::VertexReference> glyphVertex,scanlineVertex;
-    float scale = /*0.05f*//*0.1f*/0.1f;
+    float scale = /*0.05f*//*0.1f*/0.5f;
     glm::vec2 final_pos = glm::vec2(pos.x/*+RenderSystem::cam.width/2.0f*/,pos.y+RenderSystem::cam.height/2.0f+65.0f);
 
-    std::string s = /*"lazy dog"*/"$";
+    std::string s = /*"lazy dog"*/"g";
 
     std::vector<wchar_t> letters(s.c_str(), s.c_str() + s.length());
     FT_Library library;
@@ -166,21 +167,21 @@ public:
     else SDL_Log("FT Init OK!");
     for(wchar_t letter:letters)if(letter != ' '){
         float advance = freetype_test(letter,library,"assets/ah_natural.ttf"/*"assets/ipapotamus_4.ttf"*/,
-        glyphVertices,glyphIndices,scale,false);
+        glyphVertices,glyphIndices,holes,scale,false);
 
         //Polyline Test
-        //glyphVertex = assets.load<gel::VertexReference,gel::Vertex>(
-        //    std::vector<gel::VertexSpec>{gel::POSITION},glyphVertices,glyphIndices).assign(altShader);  
-        //assets.load<gel::Mesh>().assign(final_pos)
-        //    .assign(glm::vec4(0.0f,0.0f,1.0f,1.0f)).assign(glyphVertex).assign(altShader).assign((int)glyphVertices.size());
+        glyphVertex = assets.load<gel::VertexReference,gel::Vertex>(
+            std::vector<gel::VertexSpec>{gel::POSITION},glyphVertices,glyphIndices).assign(altShader);  
+        assets.load<gel::Mesh>().assign(final_pos)
+            .assign(glm::vec4(0.0f,0.0f,1.0f,1.0f)).assign(glyphVertex).assign(altShader).assign((int)glyphVertices.size());
 
         //Triangle Test
-        triangulate(glyphVertices,outVertices,outIndices);
+        triangulate(glyphVertices,holes,outVertices,outIndices);
         glyphVertex = assets.load<gel::VertexReference,gel::Vertex>(
             std::vector<gel::VertexSpec>{gel::POSITION},outVertices,outIndices).assign(altShader);
         assets.load<gel::Mesh>().assign(final_pos)
             .assign(glm::vec4(0.0f,0.0f,0.0f,1.0f)).assign(glyphVertex).assign(altShader);
-        outVertices.clear();outIndices.clear();glyphVertices.clear();glyphIndices.clear();
+        outVertices.clear();outIndices.clear();glyphVertices.clear();glyphIndices.clear();holes.clear();
 
         final_pos.x += 10/*advance * .001f*/;
     }
