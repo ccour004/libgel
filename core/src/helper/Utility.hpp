@@ -32,12 +32,12 @@ SOFTWARE.*/
 #include FT_STROKER_H
 
 int leftCell(int x,int range,int width,int height){
-    if(x - range < 0 || x % width - range < 0) return - 1;
+    if((x - range < 0) || (((x % width) - range) < 0)) return - 1;
     return x - range;
 }
 
 int rightCell(int x,int range,int width,int height){
-    if(x + range >= width * height * range || x % width + range >= width) return - 1;
+    if((x + range >= width * height * range) || ((x % width) + range >= width)) return - 1;
     return x + range;   
 }
 
@@ -52,23 +52,24 @@ int downCell(int x,int range,int width,int height){
 }
 
 int upLeftCell(int x,int range,int width,int height){
+    int left = x - range,right = (x % width) - range;
     if(x - width < 0) return -1;
-    if(x - range < 0 || x % width - range < 0) return - 1;
+    if(left < 0 || right < 0) return - 1;
     return x - width - range;
 }
 int upRightCell(int x,int range,int width,int height){
     if(x - width < 0) return -1;
-    if(x + range >= width * height * range || x % width + range >= width) return - 1;
+    if(((x + range) >= (width * height * range)) || (((x % width) + range) >= width)) return - 1;
     return x - width + range;
 }
 int downLeftCell(int x,int range,int width,int height){
     if(x + width >= width * height * range) return -1;
-    if(x - range < 0 || x % width - range < 0) return - 1;
+    if((x - range < 0) || (((x % width) - range) < 0)) return - 1;
     return x + width - range;
 }
 int downRightCell(int x,int range,int width,int height){
     if(x + width >= width * height * range) return -1;
-    if(x + range >= width * height * range || x % width + range >= width) return - 1;
+    if((x + range >= width * height * range) || (((x % width) + range) >= width)) return - 1;
     return x + width + range;
 }
 
@@ -92,9 +93,39 @@ bool isOutline(int x,int width,int rows,unsigned char* buffer){
     return false;
 }
 
+struct GLYPH_LINE{
+    GLYPH_LINE(glm::vec2 start,glm::vec2 end):start(start),end(end),slope(end-start){}
+    glm::vec2 start,end,slope;
+};
+glm::vec2 line_intersect_params(GLYPH_LINE l1,GLYPH_LINE l2){
+    glm::vec2 a = l1.start,b = l1.slope,c = l2.start,d = l2.slope;
+    return glm::vec2((d.x * (a.y-c.y) +d.y * (c.x-a.x))/(b.x*d.y-b.y*d.x),
+        (b.x * (c.y-a.y) +b.y * (a.x-c.x))/(d.x*b.y-d.y*b.x));  
+}
+bool pointInsidePolygon(glm::vec2 pt,const std::vector<glm::vec2>& polygon){
+    GLYPH_LINE inf = GLYPH_LINE(pt,glm::vec2(pt.x + 9999,pt.y + 0.01f));
+    int numIntersections = 0;
+    for(int i = 0;i < polygon.size();i++){
+        GLYPH_LINE edge = GLYPH_LINE(polygon[i],polygon[i+1 == polygon.size()?0:i+1]);
+        glm::vec2 params = line_intersect_params(inf,edge);
+        if(params.x >= 0.0f && params.x <= 1.0f && params.y >= 0.0f && params.y <= 1.0f)
+            numIntersections++;
+    }
+    return (numIntersections % 2 == 0) ? false : true;
+    //return doIntersect(pt,polygon);
+}
+bool polygonInsidePolygon(const std::vector<glm::vec2>& inner,const std::vector<glm::vec2>& outer){
+    for(glm::vec2 pt:inner) if(pointInsidePolygon(pt,outer)) return true;
+    return false;
+}
+
+struct OUTLINE{
+    std::vector<glm::vec2> points;
+    std::vector<std::vector<glm::vec2>> holes;
+};
 std::vector<glm::vec2> findOutlineVertices(int width,int height,unsigned char* buffer,std::vector<int>& remaining){
     std::vector<glm::vec2> vertices;
-    int start = remaining[0/*remaining.size()-1*/];
+    int start = remaining[0/* remaining.size()-1*/];
     vertices.push_back(glm::vec2(start % width,start / width));
     //SDL_Log("START VALUE: %i",start);
     int me = start;
@@ -123,11 +154,26 @@ std::vector<glm::vec2> findOutlineVertices(int width,int height,unsigned char* b
     return vertices;
 }
 
-float freetype_test(wchar_t ch,FT_Library& library,std::string filename,
-        std::vector<GLfloat>& line_vertices,std::vector<GLuint>& line_indices,std::vector<std::vector<GLfloat>>& holes,
-        float scale,bool loop_remove){
+void getVerticesAndIndices(std::vector<glm::vec2> shapes,float scale,std::vector<GLfloat>& vertices,std::vector<GLuint>& indices){
+    for(glm::vec2 shape:shapes){
+        vertices.push_back(shape.x * scale);
+        vertices.push_back(shape.y * scale);
+        vertices.push_back(-1.0f);
+        indices.push_back(indices.size());
+    }
+}
+
+std::vector<glm::vec2> getScaled(std::vector<glm::vec2> shapes,float scale){
+    std::vector<glm::vec2> out;
+    for(glm::vec2 shape:shapes){
+        out.push_back(glm::vec2(shape.x * scale,shape.y * scale)); 
+    }
+    return out;
+}
+
+glm::vec2 freetype_test(wchar_t ch,FT_Library& library,std::string filename,std::vector<OUTLINE>& outlines){
     // Initialize FreeType.
-    float advance = 0.0f;
+    glm::vec2 advance = glm::vec2(0.0f,0.0f);
 
     // Open up a font file.
     std::ifstream fontFile(filename.c_str(), std::ios::binary);
@@ -144,7 +190,7 @@ float freetype_test(wchar_t ch,FT_Library& library,std::string filename,
         FT_Face face;
         FT_New_Memory_Face(library, fontBuffer, fontFileSize, 0, &face);
 
-        int size = /*100*/1000;
+        int size = /*1000*/2000;
         // Set the size to use.
         if (FT_Set_Char_Size(face, size << 6, size << 6, 90, 90) == 0)
         {
@@ -156,8 +202,10 @@ float freetype_test(wchar_t ch,FT_Library& library,std::string filename,
                 if (FT_Get_Glyph(face->glyph, &glyph) == 0 && glyph->format == FT_GLYPH_FORMAT_OUTLINE)
                 {
                     //Get glyph details, convert to outline.
-                    advance = (float)glyph->advance.x * scale;
-                    SDL_Log("Horiz adv: %f",advance);
+                    //advance = (float)glyph->advance.x * scale;
+                    advance.x = (float)glyph->advance.x;
+                    advance.y = (float)glyph->advance.y;
+                    //SDL_Log("Horiz adv: %f",advance);
 
                     //Render outline to bitmap.
                     FT_Glyph_To_Bitmap(&glyph,FT_RENDER_MODE_NORMAL,0,true);                    
@@ -180,36 +228,59 @@ float freetype_test(wchar_t ch,FT_Library& library,std::string filename,
                     outfile.open("f.bin",std::ios::out | std::ios::binary | std::ios::trunc);
                     outfile.write((const char*)buffer.data(),buffer.size());
                     outfile.close();
+                    //Run: convert -depth 8 -size [width]x[height]+0 rgb:f.bin out.png
                     /**TEMP**/
 
-                    //Find outline vertices.
-                    std::vector<glm::vec2> outline_vertices = findOutlineVertices(bitmap->width,bitmap->rows,bitmap->buffer,remaining);
-                    //std::reverse(outline_vertices.begin(),outline_vertices.end());
-                    std::vector<std::vector<glm::vec2>> temp_holes;
-                    while(remaining.size() > 0) temp_holes.push_back(findOutlineVertices(bitmap->width,bitmap->rows,bitmap->buffer,remaining));
-                                    
-                    SDL_Log("Outline vertices done! Found %i vertices and %i holes.",outline_vertices.size(),temp_holes.size());
-                    for(int i = 0;i < outline_vertices.size();i++){
-                        line_vertices.push_back(outline_vertices[i].x * scale);
-                        line_vertices.push_back(outline_vertices[i].y * scale);
-                        line_vertices.push_back(-1.0f);
-                        line_indices.push_back(line_indices.size());
-                    }
-                    for(std::vector<glm::vec2> hole:temp_holes){
-                        SDL_Log("HOLE SIZE: %i",hole.size());
-                        std::vector<GLfloat> hole_vertices;
-                        /**TEMP**/
-                        if(hole.size() >= 10){
-                        /**TEMP**/
-                        for(int i = 0;i < hole.size();i++){
-                            hole_vertices.push_back(hole[i].x * scale);
-                            hole_vertices.push_back(hole[i].y * scale);
-                            hole_vertices.push_back(-1.0f);
+                    //Find all shapes.
+                    std::vector<std::vector<glm::vec2>> shapes;
+                    while(remaining.size() > 0) shapes.push_back(findOutlineVertices(bitmap->width,bitmap->rows,bitmap->buffer,remaining));
+                    SDL_Log("Found %li shapes.",shapes.size());
+
+                    //Sort shapes into outlines or holes.
+                    std::map<int,std::vector<std::vector<glm::vec2>>> holeMap;
+                    std::map<int,int> outlineMap;
+                    int holeCounter = 0;
+                    for(int i = 0;i < shapes.size();i++){
+                        OUTLINE outline;
+                        SDL_Log("SHAPE %i has %li points.",i,shapes[i].size());
+
+                        /**TEMP???**/
+                        //Is this large enough to be considered a shape?
+                        if(shapes[i].size() < 10) continue;
+                        /**TEMP???**/
+
+                        //Is this a hole?
+                        bool hole = false;
+                        for(int j = 0;j < shapes.size();j++)
+                            if(!hole && i != j && polygonInsidePolygon(shapes[i],shapes[j])){
+                                hole = true;
+                                holeCounter++;
+                                std::vector<std::vector<glm::vec2>> holes;
+                                auto search = holeMap.find(j);
+                                if(search != holeMap.end())
+                                    holes = holeMap[j];
+                                holes.push_back(shapes[i]);
+                                holeMap[j] = holes;
+                                j = shapes.size();
+                            }
+
+                        //Sort outlines vs. holes.
+                        if(!hole){ 
+                            outline.points = shapes[i];
+                            outlines.push_back(outline);
+                            outlineMap[i] = outlines.size()-1;
                         }
-                        holes.push_back(hole_vertices);
-                        /**TEMP**/
-                         }
-                        /**TEMP**/
+                    }
+                    SDL_Log("%li are outlines, %i are holes.",outlines.size(),holeCounter);
+                    
+                    //Assign any holes to owning outlines.
+                    for(int i = 0;i < shapes.size();i++){
+                        auto search = holeMap.find(i);
+                        if(search != holeMap.end()){
+                            SDL_Log("SHAPE %i has a hole! Owning outline is at: %i position.",i,outlineMap[i]);
+                            for(std::vector<glm::vec2> hole:search->second)
+                            outlines[outlineMap[i]].holes.push_back(hole);
+                        }
                     }
                 }
             }
@@ -219,7 +290,7 @@ float freetype_test(wchar_t ch,FT_Library& library,std::string filename,
     return advance;
 }
 
-void triangulate(const std::vector<GLfloat>& incoming,const std::vector<std::vector<GLfloat>>& holes,
+void triangulate(const std::vector<GLfloat>& incoming,const std::vector<std::vector<glm::vec2>>& holes,
     std::vector<GLfloat>& outgoing,std::vector<GLuint>& outgoing_indices){
     //Convert points.
     std::vector<p2t::Point*> polyline; 
@@ -245,10 +316,10 @@ void triangulate(const std::vector<GLfloat>& incoming,const std::vector<std::vec
     p2t::CDT* cdt = new p2t::CDT(polyline);
 
     //Add holes.
-    for(std::vector<GLfloat> hole:holes){
+    for(std::vector<glm::vec2> hole:holes){
         std::vector<p2t::Point*> holePoints;
-        for(int i = 0;i < hole.size();i +=3){
-            holePoints.push_back(new p2t::Point(hole[i],hole[i+1]));
+        for(glm::vec2 pt:hole){
+            holePoints.push_back(new p2t::Point(pt.x,pt.y));
         }
         cdt->AddHole(holePoints);       
     }

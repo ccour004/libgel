@@ -29,7 +29,6 @@ SOFTWARE.*/
 #include "helper/UIBuilder.hpp"
 #include "helper/ShapeBuilder.hpp"
 
-//#include <fstream>
 #include <rapidxml.hpp>
 
 #include "helper/Utility.hpp"
@@ -151,39 +150,52 @@ public:
 
     //Freetype TEST
     glm::vec2 pos = glm::vec2(0/*-RenderSystem::cam.width/2.0f*/,0);
-    std::vector<GLfloat> glyphVertices,scanlineVertices,outVertices;
-    std::vector<std::vector<GLfloat>> holes;
-    std::vector<GLuint> glyphIndices,scanlineIndices,outIndices;
-    gel::Asset<gel::VertexReference> glyphVertex,scanlineVertex;
-    float scale = /*0.05f*//*0.1f*/0.5f;
-    glm::vec2 final_pos = glm::vec2(pos.x/*+RenderSystem::cam.width/2.0f*/,pos.y+RenderSystem::cam.height/2.0f+65.0f);
-
-    std::string s = /*"lazy dog"*/"g";
+    float scale = 0.1f,advance_scale = 1e-6,advance = 0;
+    glm::vec2 final_pos = glm::vec2(pos.x+RenderSystem::cam.width/2.0f,pos.y+RenderSystem::cam.height/2.0f+65.0f);
+    std::string s = "lazy dog"/*"%"*/ /*'z' for ipapotamus_4 doesn't work!*/;
+    gel::Asset<gel::VertexReference> glyphVertex;
 
     std::vector<wchar_t> letters(s.c_str(), s.c_str() + s.length());
     FT_Library library;
     int error = FT_Init_FreeType(&library);
     if(error)SDL_Log("FT Init Error!");
-    else SDL_Log("FT Init OK!");
-    for(wchar_t letter:letters)if(letter != ' '){
-        float advance = freetype_test(letter,library,"assets/ah_natural.ttf"/*"assets/ipapotamus_4.ttf"*/,
-        glyphVertices,glyphIndices,holes,scale,false);
 
-        //Polyline Test
-        glyphVertex = assets.load<gel::VertexReference,gel::Vertex>(
-            std::vector<gel::VertexSpec>{gel::POSITION},glyphVertices,glyphIndices).assign(altShader);  
-        assets.load<gel::Mesh>().assign(final_pos)
-            .assign(glm::vec4(0.0f,0.0f,1.0f,1.0f)).assign(glyphVertex).assign(altShader).assign((int)glyphVertices.size());
+    for(wchar_t letter:letters)
+    if(letter == ' ') final_pos.x += /*advance * advance_scale*/10.0f;
+    else
+    {
+        //Get outlines and holes, and process into verts/indices.
+        std::vector<OUTLINE> outlines;
+        advance = freetype_test(letter,library,"assets/ah_natural.ttf"/*"assets/ipapotamus_4.ttf"*/,outlines).x;
+        
+        for(OUTLINE outline:outlines){
+            //Process.
+            std::vector<GLfloat> glyphVertices,outVertices;
+            std::vector<GLuint> glyphIndices,outIndices;
+            getVerticesAndIndices(outline.points,scale,glyphVertices,glyphIndices);
+            std::vector<std::vector<glm::vec2>> holes;
+            if(outline.holes.size() > 0) {
+                SDL_Log("OUTLINE HAS HOLE(S)!");
+                for(std::vector<glm::vec2> hole:outline.holes)
+                    holes.push_back(getScaled(hole,scale));
+            }
 
-        //Triangle Test
-        triangulate(glyphVertices,holes,outVertices,outIndices);
-        glyphVertex = assets.load<gel::VertexReference,gel::Vertex>(
-            std::vector<gel::VertexSpec>{gel::POSITION},outVertices,outIndices).assign(altShader);
-        assets.load<gel::Mesh>().assign(final_pos)
-            .assign(glm::vec4(0.0f,0.0f,0.0f,1.0f)).assign(glyphVertex).assign(altShader);
-        outVertices.clear();outIndices.clear();glyphVertices.clear();glyphIndices.clear();holes.clear();
+            //Polyline Test
+            glyphVertex = assets.load<gel::VertexReference,gel::Vertex>(
+                std::vector<gel::VertexSpec>{gel::POSITION},glyphVertices,glyphIndices).assign(altShader);  
+            assets.load<gel::Mesh>().assign(final_pos)
+                .assign(glm::vec4(0.0f,0.0f,1.0f,1.0f)).assign(glyphVertex).assign(altShader).assign((int)glyphVertices.size());
 
-        final_pos.x += 10/*advance * .001f*/;
+            //Triangle Test
+            triangulate(glyphVertices,holes,outVertices,outIndices);
+            glyphVertex = assets.load<gel::VertexReference,gel::Vertex>(
+                std::vector<gel::VertexSpec>{gel::POSITION},outVertices,outIndices).assign(altShader);
+            assets.load<gel::Mesh>().assign(final_pos)
+                .assign(glm::vec4(0.0f,0.0f,0.0f,1.0f)).assign(glyphVertex).assign(altShader);
+        }
+
+        //SDL_Log("ADVANCE: %f",advance * 0.0001f);
+        final_pos.x += /*advance * advance_scale*/10.0f;
     }
     FT_Done_FreeType(library);
     //Freetype TEST
