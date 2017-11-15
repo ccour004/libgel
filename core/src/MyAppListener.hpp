@@ -152,7 +152,7 @@ public:
     glm::vec2 pos = glm::vec2(0/*-RenderSystem::cam.width/2.0f*/,0);
     float scale = 0.1f,advance_scale = 1e-6,advance = 0;
     glm::vec2 final_pos = glm::vec2(pos.x+RenderSystem::cam.width/2.0f,pos.y+RenderSystem::cam.height/2.0f+65.0f);
-    std::string s = "lazy dog"/*"%"*/ /*'z' for ipapotamus_4 doesn't work!*/;
+    std::string s = "lazy dog"/*"%"*/;
     gel::Asset<gel::VertexReference> glyphVertex;
 
     std::vector<wchar_t> letters(s.c_str(), s.c_str() + s.length());

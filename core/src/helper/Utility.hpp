@@ -87,10 +87,35 @@ std::vector<int> neighborCells(int x,int range,int width,int height){
 }
 
 bool isOutline(int x,int width,int rows,unsigned char* buffer){
+    int out_of_bounds = 0,empty = 0,non_empty_cardinal = 0,non_empty_diagonal = 0;
+    int counter = 0;
     for(int neighbor:neighborCells(x,1,width,rows)){
-        if(neighbor == -1 || buffer[neighbor] == 0) return true;
+        if(neighbor == -1) out_of_bounds++;
+        else if(buffer[neighbor] == 0) empty++;
+        else {
+            if(counter <= 3) non_empty_cardinal++;
+            else non_empty_diagonal++;
+        }
+        counter++;
     }
+
+    if(empty > 0 || out_of_bounds > 0)return true;
     return false;
+}
+
+bool isCluster(int x,int width,int rows,unsigned char* buffer,std::vector<int>& remaining){
+    int counter = 0,spur_point = 0;
+    for(int neighbor:neighborCells(x,1,width,rows)){
+        if(neighbor != -1){
+            auto found = std::find(remaining.begin(),remaining.end(),neighbor); 
+            if(found != remaining.end()){
+                //RIGHT = 0,UP = 1,LEFT = 2,DOWN = 3,UP_RIGHT = 4,UP_LEFT = 5,DOWN_LEFT = 6,DOWN_RIGHT = 7
+                if(counter == 0 || counter == 1 || counter == 4) spur_point++;
+            }
+        }
+        counter++;
+    }
+    return spur_point == 3;
 }
 
 struct GLYPH_LINE{
@@ -125,7 +150,9 @@ struct OUTLINE{
 };
 std::vector<glm::vec2> findOutlineVertices(int width,int height,unsigned char* buffer,std::vector<int>& remaining){
     std::vector<glm::vec2> vertices;
-    int start = remaining[0/* remaining.size()-1*/];
+
+    //Find starting point.
+    int start = remaining[0];
     vertices.push_back(glm::vec2(start % width,start / width));
     //SDL_Log("START VALUE: %i",start);
     int me = start;
@@ -220,6 +247,14 @@ glm::vec2 freetype_test(wchar_t ch,FT_Library& library,std::string filename,std:
                              remaining.push_back(i);
                             }
                         else {buffer.push_back(0xFF);buffer.push_back(0xFF);buffer.push_back(0xFF);}
+                    }
+
+                    //Remove 4-point clusters.
+                    for(int i = 0;i < remaining.size();i++){
+                        if(isCluster(remaining[i],bitmap->width,bitmap->rows,bitmap->buffer,remaining)){
+                            //SDL_Log("REMOVING 4-point cluster AT: %i",i);
+                            remaining.erase(remaining.begin()+i);
+                        }
                     }
 
                     /**TEMP**/
