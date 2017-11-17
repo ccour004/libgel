@@ -121,7 +121,6 @@ public:
     glClearDepthf(1.0f);
     glDepthFunc(GL_LEQUAL);
     glLineWidth(2.0f);
-    //glHint(GL_PERSPECTIVE_CORRECTION_HINT, GL_NICEST);
     glClearColor( 0.66f, 0.66f, 0.66f, 1.f );
             
     //Setup input.
@@ -150,9 +149,9 @@ public:
 
     //Freetype TEST
     glm::vec2 pos = glm::vec2(0/*-RenderSystem::cam.width/2.0f*/,0);
-    float scale = 0.1f,advance_scale = 1e-6,advance = 0;
-    glm::vec2 final_pos = glm::vec2(pos.x+RenderSystem::cam.width/2.0f,pos.y+RenderSystem::cam.height/2.0f+65.0f);
-    std::string s = "lazy dog"/*"%"*/;
+    float scale = 0.05f,advance = 0;
+    glm::vec2 final_pos = glm::vec2(/*pos.x+RenderSystem::cam.width/2.0f*/0,pos.y+RenderSystem::cam.height/2.0f+65.0f);
+    std::string s = "lazy dog."/*"%"*/;
     gel::Asset<gel::VertexReference> glyphVertex;
 
     std::vector<wchar_t> letters(s.c_str(), s.c_str() + s.length());
@@ -161,12 +160,13 @@ public:
     if(error)SDL_Log("FT Init Error!");
 
     for(wchar_t letter:letters)
-    if(letter == ' ') final_pos.x += /*advance * advance_scale*/10.0f;
+    if(letter == ' ') final_pos.x += advance;
     else
     {
         //Get outlines and holes, and process into verts/indices.
         std::vector<OUTLINE> outlines;
-        advance = freetype_test(letter,library,"assets/ah_natural.ttf"/*"assets/ipapotamus_4.ttf"*/,outlines).x;
+        glm::vec4 params =  freetype_test(letter,library,"assets/ah_natural.ttf"/*"assets/ipapotamus_4.ttf"*/,outlines);
+        advance = params.x / 65536.0 * scale;
         
         for(OUTLINE outline:outlines){
             //Process.
@@ -178,24 +178,25 @@ public:
                 SDL_Log("OUTLINE HAS HOLE(S)!");
                 for(std::vector<glm::vec2> hole:outline.holes)
                     holes.push_back(getScaled(hole,scale));
-            }
+                }
 
             //Polyline Test
-            glyphVertex = assets.load<gel::VertexReference,gel::Vertex>(
+            /*glyphVertex = assets.load<gel::VertexReference,gel::Vertex>(
                 std::vector<gel::VertexSpec>{gel::POSITION},glyphVertices,glyphIndices).assign(altShader);  
             assets.load<gel::Mesh>().assign(final_pos)
-                .assign(glm::vec4(0.0f,0.0f,1.0f,1.0f)).assign(glyphVertex).assign(altShader).assign((int)glyphVertices.size());
+                .assign(glm::vec4(0.0f,0.0f,1.0f,1.0f)).assign(glyphVertex).assign(altShader).assign((int)glyphVertices.size());*/
 
             //Triangle Test
             triangulate(glyphVertices,holes,outVertices,outIndices);
+            centerPoints(outVertices,params.z * scale,params.w * scale);
             glyphVertex = assets.load<gel::VertexReference,gel::Vertex>(
                 std::vector<gel::VertexSpec>{gel::POSITION},outVertices,outIndices).assign(altShader);
             assets.load<gel::Mesh>().assign(final_pos)
                 .assign(glm::vec4(0.0f,0.0f,0.0f,1.0f)).assign(glyphVertex).assign(altShader);
         }
 
-        //SDL_Log("ADVANCE: %f",advance * 0.0001f);
-        final_pos.x += /*advance * advance_scale*/10.0f;
+        SDL_Log("ADVANCE: %f",advance);
+        final_pos.x += advance;
     }
     FT_Done_FreeType(library);
     //Freetype TEST

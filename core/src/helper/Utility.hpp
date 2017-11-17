@@ -137,7 +137,6 @@ bool pointInsidePolygon(glm::vec2 pt,const std::vector<glm::vec2>& polygon){
             numIntersections++;
     }
     return (numIntersections % 2 == 0) ? false : true;
-    //return doIntersect(pt,polygon);
 }
 bool polygonInsidePolygon(const std::vector<glm::vec2>& inner,const std::vector<glm::vec2>& outer){
     for(glm::vec2 pt:inner) if(pointInsidePolygon(pt,outer)) return true;
@@ -198,9 +197,9 @@ std::vector<glm::vec2> getScaled(std::vector<glm::vec2> shapes,float scale){
     return out;
 }
 
-glm::vec2 freetype_test(wchar_t ch,FT_Library& library,std::string filename,std::vector<OUTLINE>& outlines){
+glm::vec4 freetype_test(wchar_t ch,FT_Library& library,std::string filename,std::vector<OUTLINE>& outlines){
     // Initialize FreeType.
-    glm::vec2 advance = glm::vec2(0.0f,0.0f);
+    glm::vec4 advance = glm::vec4(0.0f,0.0f,0.0f,0.0f);
 
     // Open up a font file.
     std::ifstream fontFile(filename.c_str(), std::ios::binary);
@@ -237,8 +236,10 @@ glm::vec2 freetype_test(wchar_t ch,FT_Library& library,std::string filename,std:
                     //Render outline to bitmap.
                     FT_Glyph_To_Bitmap(&glyph,FT_RENDER_MODE_NORMAL,0,true);                    
                     FT_Bitmap *bitmap = &reinterpret_cast<FT_BitmapGlyph>(glyph)->bitmap;
-                    SDL_Log("BITMAP INFO - pitch: %i,rows: %i,width: %i, pixel_mode: %i,num_grays = %i",
-                        bitmap->pitch,bitmap->width,bitmap->rows,bitmap->pixel_mode,bitmap->num_grays);
+                    int left = *&reinterpret_cast<FT_BitmapGlyph>(glyph)->left,top = *&reinterpret_cast<FT_BitmapGlyph>(glyph)->top;
+                    SDL_Log("BITMAP INFO - pitch: %i,rows: %i,width: %i, pixel_mode: %i,num_grays = %i,left = %i,top = %i",
+                        bitmap->pitch,bitmap->width,bitmap->rows,bitmap->pixel_mode,bitmap->num_grays,left,top);
+                    advance.z = left;advance.w = top;
                     std::vector<unsigned char> buffer;std::vector<int> remaining;
                     for(int i = 0;i < bitmap->width * bitmap->rows;i++){
                         //SDL_Log("PIXEL: %i",bitmap->buffer[i]);
@@ -379,4 +380,11 @@ void triangulate(const std::vector<GLfloat>& incoming,const std::vector<std::vec
     //Clean up.
     delete cdt;
     polyline.clear();
+}
+
+void centerPoints(std::vector<GLfloat>& vertices,float left,float up){
+    for(int i = 0;i < vertices.size();i += 3){
+        vertices[i] += left;
+        vertices[i+1] -= up;
+    }
 }
