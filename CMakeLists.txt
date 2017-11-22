@@ -155,6 +155,12 @@ else()
 	add_library(SDL2_ttf SHARED IMPORTED)
 	set_target_properties(SDL2_ttf PROPERTIES IMPORTED_LOCATION ${PREBUILT}/libSDL2_ttf-2.0.so)
 
+	#Assimp
+	include_directories(${EXTERNAL}/Assimp/src/Assimp/include)
+	include_directories(${EXTERNAL}/Assimp/src/Assimp-build/include)
+	add_library(assimp SHARED IMPORTED)
+	set_target_properties(assimp PROPERTIES IMPORTED_LOCATION ${PREBUILT}/libassimp.so)
+
 	#Bullet Physics (v.3, but only using v.2 CPU-based code)
 	include_directories(${EXTERNAL}/Bullet/src/Bullet/src)
 
@@ -180,7 +186,7 @@ else()
 	add_executable(Core ${P2T_COMMON} ${P2T_SWEEP} ${SOURCE})
 	include_directories(core/src)
         target_link_libraries(Core ${OPENGL_LIBRARIES} ${GLEW_LIBRARIES} ${FREETYPE_LIBRARIES} SDL2 SDL2_image SDL2_ttf
-		linearMath common collision dynamics entityx)
+		linearMath common collision dynamics entityx assimp)
 endif()
 
 

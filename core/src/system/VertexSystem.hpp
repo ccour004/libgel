@@ -80,7 +80,7 @@ public:
 
                 for(int i = 0;i < vertex.descriptors.size();i++){
                     glEnableVertexAttribArray(shader->getAttribute(vertex.descriptors[i].name));
-                    SDL_Log("FOR ATTRIBUTE %s value is %i",vertex.descriptors[i].name.c_str(),shader->getAttribute(vertex.descriptors[i].name));
+                    //SDL_Log("FOR ATTRIBUTE %s value is %i",vertex.descriptors[i].name.c_str(),shader->getAttribute(vertex.descriptors[i].name));
                     glVertexAttribPointer(shader->getAttribute(vertex.descriptors[i].name),
                         vertex.descriptors[i].size,vertex.descriptors[i].type,GL_FALSE,total_size/*0*/,BUFFER_OFFSET(offset));
                     offset += sizeof(vertex.descriptors[i].type) * vertex.descriptors[i].size;

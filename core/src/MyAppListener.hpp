@@ -113,6 +113,9 @@ public:
 
 class MyAppListener: public gel::DefaultAppListener{
 public:
+    gel::Asset<gel::Mesh> zMesh;
+    std::vector<gel::Asset<gel::Mesh>> meshes;
+    std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
  bool create(){
     DefaultAppListener::create();
 
@@ -142,43 +145,47 @@ public:
         gel::ShaderSource("assets/alt.vert",GL_VERTEX_SHADER,prepend),
         gel::ShaderSource("assets/alt.frag",GL_FRAGMENT_SHADER,prepend)
     }),
+    textShader = assets.load<gel::ShaderProgram,gel::ShaderSpec>("text",std::vector<gel::ShaderSource>{
+        gel::ShaderSource("assets/text.vert",GL_VERTEX_SHADER,prepend),
+        gel::ShaderSource("assets/text.frag",GL_FRAGMENT_SHADER,prepend)
+    }),
     texShader = assets.load<gel::ShaderProgram,gel::ShaderSpec>("tex",std::vector<gel::ShaderSource>{
         gel::ShaderSource("assets/texTest.vert",GL_VERTEX_SHADER,prepend),
         gel::ShaderSource("assets/texTest.frag",GL_FRAGMENT_SHADER,prepend)
     });
 
     //Freetype TEST
-    glm::vec2 pos = glm::vec2(0/*-RenderSystem::cam.width/2.0f*/,0);
-    float scale = 0.05f,advance = 0;
-    glm::vec2 final_pos = glm::vec2(/*pos.x+RenderSystem::cam.width/2.0f*/0,pos.y+RenderSystem::cam.height/2.0f+65.0f);
-    std::string s = "lazy dog."/*"%"*/;
-    gel::Asset<gel::VertexReference> glyphVertex;
+  //  glm::vec2 pos = glm::vec2(0/*-RenderSystem::cam.width/2.0f*/,0);
+  //  float scale = 0.1f,advance = 0;
+ //   glm::vec2 final_pos = glm::vec2(/*pos.x+RenderSystem::cam.width/2.0f*/0,pos.y+RenderSystem::cam.height/2.0f+65.0f);
+ //   std::string s = "lazy dog."/*"%"*/;
+  //  gel::Asset<gel::VertexReference> glyphVertex;
 
-    std::vector<wchar_t> letters(s.c_str(), s.c_str() + s.length());
-    FT_Library library;
-    int error = FT_Init_FreeType(&library);
-    if(error)SDL_Log("FT Init Error!");
+ //   std::vector<wchar_t> letters(s.c_str(), s.c_str() + s.length());
+ //   FT_Library library;
+ //   int error = FT_Init_FreeType(&library);
+  //  if(error)SDL_Log("FT Init Error!");
 
-    for(wchar_t letter:letters)
-    if(letter == ' ') final_pos.x += advance;
-    else
-    {
+ //   for(wchar_t letter:letters)
+ //   if(letter == ' ') final_pos.x += advance;
+ //   else
+ //   {
         //Get outlines and holes, and process into verts/indices.
-        std::vector<OUTLINE> outlines;
-        glm::vec4 params =  freetype_test(letter,library,"assets/ah_natural.ttf"/*"assets/ipapotamus_4.ttf"*/,outlines);
-        advance = params.x / 65536.0 * scale;
+  //      std::vector<OUTLINE> outlines;
+ //       glm::vec4 params =  freetype_test(letter,library,"assets/ah_natural.ttf"/*"assets/ipapotamus_4.ttf"*/,outlines);
+ //       advance = params.x / 65536.0 * scale;
         
-        for(OUTLINE outline:outlines){
+  //      for(OUTLINE outline:outlines){
             //Process.
-            std::vector<GLfloat> glyphVertices,outVertices;
-            std::vector<GLuint> glyphIndices,outIndices;
-            getVerticesAndIndices(outline.points,scale,glyphVertices,glyphIndices);
-            std::vector<std::vector<glm::vec2>> holes;
-            if(outline.holes.size() > 0) {
-                SDL_Log("OUTLINE HAS HOLE(S)!");
-                for(std::vector<glm::vec2> hole:outline.holes)
-                    holes.push_back(getScaled(hole,scale));
-                }
+  //          std::vector<GLfloat> glyphVertices,outVertices;
+  //          std::vector<GLuint> glyphIndices,outIndices;
+  //          getVerticesAndIndices(outline.points,scale,glyphVertices,glyphIndices);
+   //         std::vector<std::vector<glm::vec2>> holes;
+  //          if(outline.holes.size() > 0) {
+  //              SDL_Log("OUTLINE HAS HOLE(S)!");
+  //              for(std::vector<glm::vec2> hole:outline.holes)
+  //                  holes.push_back(getScaled(hole,scale));
+  //              }
 
             //Polyline Test
             /*glyphVertex = assets.load<gel::VertexReference,gel::Vertex>(
@@ -187,19 +194,31 @@ public:
                 .assign(glm::vec4(0.0f,0.0f,1.0f,1.0f)).assign(glyphVertex).assign(altShader).assign((int)glyphVertices.size());*/
 
             //Triangle Test
-            triangulate(glyphVertices,holes,outVertices,outIndices);
-            centerPoints(outVertices,params.z * scale,params.w * scale);
-            glyphVertex = assets.load<gel::VertexReference,gel::Vertex>(
-                std::vector<gel::VertexSpec>{gel::POSITION},outVertices,outIndices).assign(altShader);
-            assets.load<gel::Mesh>().assign(final_pos)
-                .assign(glm::vec4(0.0f,0.0f,0.0f,1.0f)).assign(glyphVertex).assign(altShader);
-        }
+   //         triangulate(glyphVertices,holes,outVertices,outIndices);
+   ///         centerPoints(outVertices,params.z * scale,params.w * scale);
+   //         glyphVertex = assets.load<gel::VertexReference,gel::Vertex>(
+   //             std::vector<gel::VertexSpec>{gel::POSITION},outVertices,outIndices).assign(letter == 'z'?textShader:altShader);
+   //         gel::Asset<gel::Mesh> tempMesh;
+   //         tempMesh = assets.load<gel::Mesh>().assign(final_pos)
+   //             .assign(glm::vec4(0.0f,0.0f,0.0f,1.0f)).assign(glyphVertex).assign(letter == 'z'?textShader:altShader);
+   //         if(letter == 'z') {zMesh = tempMesh;
+   //                 auto end = std::chrono::system_clock::now();
+   // std::chrono::duration<double> elapsed_seconds = end-start;
+   // zMesh.assign((float)elapsed_seconds.count());
+   //         }
+  //      }
 
-        SDL_Log("ADVANCE: %f",advance);
-        final_pos.x += advance;
-    }
-    FT_Done_FreeType(library);
+  //      SDL_Log("ADVANCE: %f",advance);
+   //     final_pos.x += advance;
+  //  }
+  //  FT_Done_FreeType(library);
     //Freetype TEST
+
+    //ASSIMP TEST
+    glm::mat4 transform = glm::mat4();
+    transform = glm::rotate(transform,-1.570797f,glm::vec3(1,0,0));
+    importModel("assets/model/dwarf.x"/*jeep1.fbx*//*dwarf.x*/,assets,texShader,transform,meshes);
+    //ASSIMP TEST
     
     //Create sphere.
     std::vector<GLfloat> vertices = std::vector<GLfloat>();
@@ -230,15 +249,16 @@ public:
         std::vector<GLuint> tempindices = std::vector<GLuint>();
         gel::ShapeBuilder::buildBox(tempvertices,tempindices,obstruction[3],obstruction[4],obstruction[5]);
         groundVertex = assets.load<gel::VertexReference,gel::Vertex>(std::vector<gel::VertexSpec>{gel::POSITION,gel::TEXTURE_0},tempvertices,tempindices)
-                        .assign(texShader);
+                        .assign(altShader);
         
         //Build ground entity.
         PhysicsSystem::shapes.push_back(new btBoxShape(btVector3(obstruction[3] / 2.0f,obstruction[4] / 2.0f,obstruction[5] / 2.0f)));
+        glm::mat4 transform = glm::translate(glm::mat4(),glm::vec3(obstruction[0],obstruction[1],obstruction[2]));
         assets.load<gel::Mesh>()
-            .assign(glm::mat4()).assign(glm::vec4(1.0f,1.0f,1.0f,1.0f)).assign(glm::vec3(obstruction[0],obstruction[1],obstruction[2]))
+            .assign(transform).assign(glm::vec4(((float) rand()) / (float) RAND_MAX,((float) rand()) / (float) RAND_MAX,((float) rand()) / (float) RAND_MAX,1.0f))
             .assign(RigidBody(std::string("test"),0.0f,btVector3(obstruction[0],obstruction[1],obstruction[2]),
                 PhysicsSystem::shapes[PhysicsSystem::shapes.size()-1]))
-            .assign(texShader).assign(groundVertex).assign(sphereTexture);
+            .assign(altShader).assign(groundVertex).assign(sphereTexture);
     }
     
     //Load spheres.
@@ -249,8 +269,9 @@ public:
 
     while(!sstream.eof()){
         sstream>>x>>y>>z;
+        glm::mat4 transform = glm::translate(glm::mat4(),glm::vec3(x,y,z));
         assets.load<gel::Mesh>()
-            .assign(glm::mat4()).assign(glm::vec3(x,y,z))
+            .assign(transform)
             .assign(glm::vec4(((float) rand()) / (float) RAND_MAX,((float) rand()) / (float) RAND_MAX,((float) rand()) / (float) RAND_MAX,1.0f))
             .assign(RigidBody(std::string("test"),10.0f,btVector3(x,y,z),PhysicsSystem::shapes[0]))
             .assign(texShader).assign(sphereVertex).assign(sphereTexture);
@@ -263,7 +284,16 @@ public:
 
  void resize(int width, int height){
     RenderSystem::cam.setAspect((float)width,(float)height);
- }
+}
+
+void render(){
+
+   /* auto end = std::chrono::system_clock::now();
+    std::chrono::duration<double> elapsed_seconds = end-start;
+    entityx::ComponentHandle<float> timeRef = zMesh.component<float>();
+    *timeRef = elapsed_seconds.count();*/
+    DefaultAppListener::render();
+}
 
  void pause(){}
  void resume(){}

@@ -31,6 +31,123 @@ SOFTWARE.*/
 #include FT_FREETYPE_H
 #include FT_STROKER_H
 
+#include <sstream>
+#include <assimp/Importer.hpp>
+#include <assimp/scene.h>
+#include <assimp/postprocess.h>
+
+glm::mat4 getMat4x4(aiMatrix4x4 transform){
+    return glm::mat4(transform.a1,transform.a2,transform.a3,transform.a4,
+                     transform.b1,transform.b2,transform.b3,transform.b4,
+                     transform.c1,transform.c2,transform.c3,transform.c4,
+                     transform.d1,transform.d2,transform.d3,transform.d4);
+}
+
+void processNode(aiNode* node,AssetSystem& assets,std::vector<gel::Asset<gel::TextureReference>>& texture,
+    std::vector<std::vector<unsigned int>>& materialIndex,gel::Asset<gel::ShaderProgram>& shader,
+    std::vector<std::vector<gel::Asset<gel::VertexReference>>>& vertex,glm::mat4 parent_transform,std::vector<gel::Asset<gel::Mesh>>& meshes,
+    std::vector<std::string>& meshNames){
+
+    SDL_Log("NUM MESHES: %i",node->mNumMeshes);
+    glm::mat4 transform = parent_transform;
+    //if(node->mParent) transform = getMat4x4(node->mParent->mTransformation)  * getMat4x4(node->mTransformation);
+    SDL_Log("{%f,%f,%f,%f,",transform[0][0],transform[0][1],transform[0][2],transform[0][3]);
+    SDL_Log(" %f,%f,%f,%f,",transform[1][0],transform[1][1],transform[1][2],transform[1][3]);
+    SDL_Log(" %f,%f,%f,%f,",transform[2][0],transform[2][1],transform[2][2],transform[2][3]);
+    SDL_Log(" %f,%f,%f,%f}",transform[3][0],transform[3][1],transform[3][2],transform[3][3]);
+    for(int i = 0;i < node->mNumMeshes;i++){
+        for(gel::Asset<gel::VertexReference> vert:vertex[node->mMeshes[i]]){
+           gel::Asset<gel::Mesh> mesh = assets.load<gel::Mesh,gel::Mesh>(meshNames[node->mMeshes[i]])
+                .assign(transform).assign(glm::vec4(1.0f,1.0f,1.0f,1.0f))
+                .assign(shader).assign(vert);
+           if(texture.size() > 0) mesh.assign(texture[materialIndex[i][node->mMeshes[i]]]);
+           meshes.push_back(mesh);
+        }
+    }
+    for(int i = 0;i < node->mNumChildren;i++)
+        processNode(node->mChildren[i],assets,texture,materialIndex,shader,vertex,transform,meshes,meshNames);
+}
+
+void processModel(const aiScene* scene,AssetSystem& assets,gel::Asset<gel::ShaderProgram>& shader,glm::mat4 transform,
+    std::vector<gel::Asset<gel::Mesh>>& meshes){
+    SDL_Log(">>aiScene<< HasMeshes: %s",scene->HasMeshes() == true?"true":"false");
+    std::vector<gel::Asset<gel::TextureReference>> texture;
+    std::vector<std::vector<unsigned int>> materialIndex;
+    //Load Materials.
+    for(int i = 0;i < scene->mNumMaterials;i++){
+        aiString* path = new aiString;
+        SDL_Log("DIFFUSE TEXTURES: %i",scene->mMaterials[i]->GetTextureCount(aiTextureType_DIFFUSE));
+        if(scene->mMaterials[i]->GetTextureCount(aiTextureType_DIFFUSE) > 0){
+            scene->mMaterials[i]->GetTexture(aiTextureType_DIFFUSE,0,path);
+            SDL_Log("DIFFUSE TEXTURE PATH: %s",path->C_Str());
+            std::ostringstream stream;
+            stream << "assets/model/" << path->C_Str();
+            texture.push_back(assets.load<gel::TextureReference,gel::Texture>(stream.str().c_str()));
+        }
+    }
+
+    //Load Meshes.
+    std::vector<std::vector<gel::Asset<gel::VertexReference>>> vertexGroup;
+    std::vector<std::string> meshNames;
+    for(int i = 0;i < scene->mNumMeshes;i++){
+        SDL_Log(">>aiMesh<< mName: %s",scene->mMeshes[i]->mName.C_Str());
+        //SDL_Log(">>aiMesh<< mNumFaces: %i",scene->mMeshes[i]->mNumFaces);
+        //SDL_Log(">>aiMesh<< mNumUVComponents: %i",*scene->mMeshes[i]->mNumUVComponents);
+        std::vector<gel::Asset<gel::VertexReference>> vertex;
+        std::vector<unsigned int> material;
+        std::vector<GLfloat> vertices;
+        for(int j = 0;j < scene->mMeshes[i]->mNumVertices;j++){
+            vertices.push_back(scene->mMeshes[i]->mVertices[j].x);
+            vertices.push_back(scene->mMeshes[i]->mVertices[j].y);
+            vertices.push_back(scene->mMeshes[i]->mVertices[j].z);
+            if(texture.size() > 0){
+                vertices.push_back(scene->mMeshes[i]->mTextureCoords[0][j].x);
+                vertices.push_back(scene->mMeshes[i]->mTextureCoords[0][j].y);
+            }
+        }
+        for(int j = 0;j < scene->mMeshes[i]->mNumFaces;j++){
+            std::vector<GLuint> indices;
+            //SDL_Log(">>aiFace<< mNumIndices: %i",scene->mMeshes[i]->mFaces[j].mNumIndices);
+            for(int k = 0;k < scene->mMeshes[i]->mFaces[j].mNumIndices;k++)
+                indices.push_back(scene->mMeshes[i]->mFaces[j].mIndices[k]);
+            std::vector<gel::VertexSpec> spec = std::vector<gel::VertexSpec>{gel::POSITION};
+            if(texture.size() > 0){
+                spec.push_back(gel::TEXTURE_0);
+                material.push_back(scene->mMeshes[i]->mMaterialIndex);
+            }
+            vertex.push_back(assets.load<gel::VertexReference,gel::Vertex>(spec,vertices,indices).assign(shader));
+        }
+        vertexGroup.push_back(vertex);
+        materialIndex.push_back(material);
+        meshNames.push_back(scene->mMeshes[i]->mName.C_Str());
+    }
+
+    //Load Nodes
+    processNode(scene->mRootNode,assets,texture,materialIndex,shader,vertexGroup,transform,meshes,meshNames);
+}
+
+bool importModel(const std::string& file,AssetSystem& assets,gel::Asset<gel::ShaderProgram>& shader,glm::mat4 transform,
+    std::vector<gel::Asset<gel::Mesh>>& meshes){
+    Assimp::Importer importer;
+    int flags = aiProcess_CalcTangentSpace       |
+        aiProcess_Triangulate            |
+        aiProcess_JoinIdenticalVertices  | aiProcess_FlipUVs |
+        aiProcess_SortByPType;
+    std::string suffix = ".x";
+    /*if(file.size() >= suffix.size() &&
+           file.compare(file.size() - suffix.size(), suffix.size(), suffix) == 0)
+        flags |= aiProcess_FlipUVs;*/
+    const aiScene* scene = importer.ReadFile(file,flags);
+    if(!scene){
+        SDL_Log("Scene load failed: %s",importer.GetErrorString());
+        return false;
+    }
+
+    processModel(scene,assets,shader,transform,meshes);
+    //delete scene;
+    return true;
+}
+
 int leftCell(int x,int range,int width,int height){
     if((x - range < 0) || (((x % width) - range) < 0)) return - 1;
     return x - range;
@@ -258,14 +375,14 @@ glm::vec4 freetype_test(wchar_t ch,FT_Library& library,std::string filename,std:
                         }
                     }
 
-                    /**TEMP**/
+                    /**TEMP**
                     std::ofstream outfile;
                     std::vector<char> name; name.push_back((char)ch);
                     outfile.open("f.bin",std::ios::out | std::ios::binary | std::ios::trunc);
                     outfile.write((const char*)buffer.data(),buffer.size());
                     outfile.close();
                     //Run: convert -depth 8 -size [width]x[height]+0 rgb:f.bin out.png
-                    /**TEMP**/
+                    //*TEMP**/
 
                     //Find all shapes.
                     std::vector<std::vector<glm::vec2>> shapes;

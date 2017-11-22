@@ -33,6 +33,8 @@ SOFTWARE.*/
 
 namespace gel{
     struct Mesh{
+        std::string name = "<NULL>";
+        Mesh(std::string name):name(name){}
         //TODO: fill this out!!
     };
 }
@@ -48,7 +50,7 @@ public:
     static GLuint lastVAO;
 
     RenderSystem(){
-        cam = gel::Camera(glm::radians(90.0f),640.0f,480.0f,0.1f,100.0f);
+        cam = gel::Camera(glm::radians(90.0f),640.0f,480.0f,0.1f,1000.0f);
         cam.lookAt(eye,glm::vec3(0,0,0),glm::vec3(0,1,0));
     }
     void update(entityx::EntityManager& entities,entityx::EventManager& events,entityx::TimeDelta dt) override{
@@ -61,18 +63,18 @@ public:
         cam.lookAt(eye,glm::vec3(0,0,0),glm::vec3(0,1,0));
 
         //3D models
-        entities.each<gel::Asset<gel::ShaderProgram>,gel::Asset<gel::VertexReference>,glm::vec3,glm::vec4,glm::mat4>([](entityx::Entity entity,
-            gel::Asset<gel::ShaderProgram>& shaderHandle,gel::Asset<gel::VertexReference>& vertexHandle,glm::vec3& pos,glm::vec4& color,glm::mat4& model) {
+        entities.each<gel::Asset<gel::ShaderProgram>,gel::Asset<gel::VertexReference>,glm::vec4,glm::mat4>([](entityx::Entity entity,
+            gel::Asset<gel::ShaderProgram>& shaderHandle,gel::Asset<gel::VertexReference>& vertexHandle,glm::vec4& color,glm::mat4& model) {
             entityx::ComponentHandle<RigidBody> body = entity.component<RigidBody>();
             entityx::ComponentHandle<gel::ShaderProgram> shader = shaderHandle.component<gel::ShaderProgram>();
             entityx::ComponentHandle<gel::VertexReference> vertex = vertexHandle.component<gel::VertexReference>();
-            entityx::ComponentHandle<gel::TextureReference> texture = 
-                entity.component<gel::Asset<gel::TextureReference>>()->get().component<gel::TextureReference>();
+            entityx::ComponentHandle<gel::TextureReference> texture;
+            if(entity.component<gel::Asset<gel::TextureReference>>())
+                texture = entity.component<gel::Asset<gel::TextureReference>>()->get().component<gel::TextureReference>();
    
-            if(body->mass == 0.0f) model = glm::translate(glm::mat4(1.0f),pos);
-            else{
+            if(body && body->mass != 0.0f){
                 body->motionState->getWorldTransform(trans);
-                model = glm::translate(glm::mat4(1.0f),glm::vec3(float(trans.getOrigin().getX()),
+                model = glm::translate(glm::mat4(),glm::vec3(float(trans.getOrigin().getX()),
                     float(trans.getOrigin().getY()), float(trans.getOrigin().getZ())));
             }
 
@@ -98,11 +100,13 @@ public:
             gel::Asset<gel::ShaderProgram>& shaderHandle/*,gel::Asset<gel::TextureReference>& texHandle*/,gel::Asset<gel::VertexReference>& vertexHandle,glm::vec2& pos,glm::vec4& color) {
             entityx::ComponentHandle<gel::ShaderProgram> shader = shaderHandle.component<gel::ShaderProgram>();
             entityx::ComponentHandle<gel::VertexReference> vertex = vertexHandle.component<gel::VertexReference>();
+            entityx::ComponentHandle<float> timeRef = entity.component<float>();
             //entityx::ComponentHandle<gel::TextureReference> texture = texHandle.component<gel::TextureReference>(); 
 
             if(shader){
                 shader->begin();
                 shader->setAttribute("a_color",std::vector<GLfloat>{color.r,color.g,color.b,color.a});
+                if(timeRef) shader->setAttribute("time",std::vector<GLfloat>{*timeRef});
                 shader->setUniform("u_projView",cam.getOrtho() * glm::translate(glm::mat4(1.0f),glm::vec3(pos.x,pos.y,0.0f)),false);
             }
 

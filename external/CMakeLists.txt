@@ -65,6 +65,13 @@ ExternalProject_Add(SDL2_ttf_DL
 #	INSTALL_COMMAND cmake -E echo "Skipping install step."
 #	BUILD_COMMAND make)
 
+#Assimp
+ExternalProject_Add(Assimp
+	GIT_REPOSITORY https://github.com/assimp/assimp.git
+	PREFIX Assimp
+	INSTALL_COMMAND cmake -E echo "Skipping install step."
+	BUILD_COMMAND make)	
+
 #Bullet Physics (v.3, but only using v.2 CPU-based code)
 ExternalProject_Add(Bullet 
 	GIT_REPOSITORY https://github.com/bulletphysics/bullet3.git
