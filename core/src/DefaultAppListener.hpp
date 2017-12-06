@@ -73,14 +73,14 @@ namespace gel{
             }     
             now = std::chrono::system_clock::now();
             delta = now - lastTime;lastTime = now;
-            entityx::TimeDelta dt = std::chrono::duration_cast<std::chrono::milliseconds>(delta).count();
+            dt = std::chrono::duration_cast<std::chrono::milliseconds>(delta).count();
             
             assets.getSystems().update<TextureSystem>(dt);
             assets.getSystems().update<FontSystem>(dt);
             assets.getSystems().update<VertexSystem>(dt);
             assets.getSystems().update<ShaderSystem>(dt);
             //assets.getSystems().update<PhysicsSystem>(dt);
-            assets.getSystems().update<RenderSystem>(dt);
+            //assets.getSystems().update<RenderSystem>(dt);
         }
 
         void dispose(){

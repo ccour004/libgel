@@ -29,7 +29,7 @@ SOFTWARE.*/
 #include <btBulletCollisionCommon.h>
 #include <LinearMath/btDefaultMotionState.h>
 
-#define MAX_SUB_STEPS 5
+#define MAX_SUB_STEPS /*5*/1
 #define FIXED_TIME_STEP 1.0f/60.0f
 
 struct RigidBody{
@@ -77,7 +77,7 @@ public:
         solver = new btSequentialImpulseConstraintSolver;
 
         world = new btDiscreteDynamicsWorld(dispatcher,broadphase,solver,config);
-        world->setGravity(btVector3(0, -10, 0));        
+        world->setGravity(btVector3(0, /*-10*/-9.81f, 0));        
     }
 
     void receive(const entityx::ComponentAddedEvent<RigidBody>& event){
@@ -101,6 +101,8 @@ public:
             btRigidBody::btRigidBodyConstructionInfo rbInfo(rb->mass, rb->motionState, rb->shape,
                                                                 localInertia);
             //Add the rigid body to the scene.
+            rbInfo.m_friction = 0.65f;
+            rbInfo.m_restitution = 0.00f;
             rb->body = new btRigidBody(rbInfo);
             world->addRigidBody(rb->body);
         }catch(std::exception& e){
@@ -110,7 +112,7 @@ public:
     void receive(const entityx::ComponentRemovedEvent<RigidBody>& event){
         SDL_Log("Removing rigid body...");
         //if (event.component.get()->body && event.component.get()->body->getMotionState()) delete event.component.get()->body->getMotionState();
-        //world->removeCollisionObject((btCollisionObject*)event.component.get()->body);
+        world->removeCollisionObject((btCollisionObject*)event.component.get()->body);
         SDL_Log("...rigid body remove complete.");
     }
 

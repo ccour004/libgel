@@ -34,7 +34,8 @@ SOFTWARE.*/
 namespace gel{
     struct Mesh{
         std::string name = "<NULL>";
-        Mesh(std::string name):name(name){}
+        glm::mat4 transform = glm::mat4();
+        Mesh(std::string name,glm::mat4 transform):name(name),transform(transform){}
         //TODO: fill this out!!
     };
 }
@@ -48,6 +49,8 @@ public:
     static glm::vec3 eye;
     static btTransform trans;
     static GLuint lastVAO;
+
+    static int rotCounter;
 
     RenderSystem(){
         cam = gel::Camera(glm::radians(90.0f),640.0f,480.0f,0.1f,1000.0f);
@@ -69,13 +72,33 @@ public:
             entityx::ComponentHandle<gel::ShaderProgram> shader = shaderHandle.component<gel::ShaderProgram>();
             entityx::ComponentHandle<gel::VertexReference> vertex = vertexHandle.component<gel::VertexReference>();
             entityx::ComponentHandle<gel::TextureReference> texture;
-            if(entity.component<gel::Asset<gel::TextureReference>>())
-                texture = entity.component<gel::Asset<gel::TextureReference>>()->get().component<gel::TextureReference>();
-   
+            if(entity.component<gel::Asset<gel::TextureReference>>()){
+                gel::Asset<gel::TextureReference> ref = entity.component<gel::Asset<gel::TextureReference>>()->get();
+                if(ref.component<gel::TextureReference>())
+                    texture = ref.component<gel::TextureReference>();
+                }
+
             if(body && body->mass != 0.0f){
                 body->motionState->getWorldTransform(trans);
-                model = glm::translate(glm::mat4(),glm::vec3(float(trans.getOrigin().getX()),
-                    float(trans.getOrigin().getY()), float(trans.getOrigin().getZ())));
+                model = glm::mat4();
+                for(int i = 0;i < 4;i++)
+                for(int j = 0;j < 4;j++)
+                    model[i][j] = float(trans.getBasis()[i][j]);
+                model[3][3] = 1.0f;
+            }
+                
+            if(entity.component<gel::Mesh>()){
+                glm::mat4 reference = glm::rotate(-1.570797f,glm::vec3(1,0,0));
+                std::string strfind = entity.component<gel::Mesh>()->name;
+                glm::mat4 local_transform = entity.component<gel::Mesh>()->transform;
+                entityx::ComponentHandle<glm::mat4> transform = entity.component<glm::mat4>();
+                if(strfind.find("blade") != std::string::npos){
+                    glm::mat4 rotate = glm::rotate(0.01f * (rotCounter++),glm::vec3(0,0,1));
+                    *transform = reference * local_transform * rotate;
+                }else{
+                    model = model * reference * local_transform;
+                }
+                // SDL_Log("MESH NAME: %s",mesh.component<gel::Mesh>()->name.c_str());
             }
 
             if(shader){
@@ -83,8 +106,8 @@ public:
                 shader->setAttribute("a_color",std::vector<GLfloat>{color.r,color.g,color.b,color.a});
                 shader->setUniform("u_projView",cam.getCombined() * model,false);
             }
-
-            if(texture) glBindTexture(GL_TEXTURE_2D,texture->tex);
+            
+            if(texture) {/*SDL_Log("TEXTURE: %i",texture->tex);*/glBindTexture(GL_TEXTURE_2D,texture->tex);}
             if(vertex){
                 if(lastVAO != vertex->vao){
                     lastVAO = vertex->vao;
@@ -107,7 +130,7 @@ public:
                 shader->begin();
                 shader->setAttribute("a_color",std::vector<GLfloat>{color.r,color.g,color.b,color.a});
                 if(timeRef) shader->setAttribute("time",std::vector<GLfloat>{*timeRef});
-                shader->setUniform("u_projView",cam.getOrtho() * glm::translate(glm::mat4(1.0f),glm::vec3(pos.x,pos.y,0.0f)),false);
+                shader->setUniform("u_projView",/*cam.getOrtho() * glm::translate(glm::mat4(1.0f),glm::vec3(pos.x,pos.y,0.0f))*/glm::ortho(0.0f,1.0f,1.0f,0.0f,0.1f,100.0f) * glm::translate(glm::vec3(0,0,-1)),false);
             }
 
             //if(texture) glBindTexture(GL_TEXTURE_2D,texture->tex);
@@ -116,7 +139,8 @@ public:
                     lastVAO = vertex->vao;
                     glBindVertexArray(vertex->vao);
                 }
-                glDrawElements(GL_TRIANGLES,vertex->ibo_size,GL_UNSIGNED_INT,0);
+                //glDrawElements(GL_TRIANGLES,vertex->ibo_size,GL_UNSIGNED_INT,0);
+                glDrawArrays(GL_TRIANGLES,0,3);
             }
             if(shader) shader->end();
          });
@@ -155,3 +179,4 @@ bool RenderSystem::drag = false;
 btTransform RenderSystem::trans;
 glm::vec3 RenderSystem::eye = ((float)glm::clamp(RenderSystem::x,1,72)) * glm::normalize(glm::vec3(50,10,50));
 GLuint RenderSystem::lastVAO = -1;
+int RenderSystem::rotCounter = 0;

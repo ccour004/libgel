@@ -46,6 +46,7 @@
         "utility": "cpp",
         "valarray": "cpp",
         "algorithm": "cpp",
-        "*.ipp": "cpp"
+        "*.ipp": "cpp",
+        "vector": "cpp"
     }
 }

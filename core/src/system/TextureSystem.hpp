@@ -30,6 +30,14 @@ namespace gel{
         std::string filename;
         Texture(std::string filename):filename(filename){}     
     };
+    struct TextureData{
+        void* pixels;
+        int width,height,depth,pitch;
+        Uint32 Rmask,Gmask,Bmask,Amask;
+        TextureData(void* pixels,int width,int height,int depth,int pitch,
+        Uint32 Rmask,Uint32 Gmask,Uint32 Bmask,Uint32 Amask):pixels(pixels),width(width),height(height),depth(depth),pitch(pitch),
+            Rmask(Rmask),Gmask(Gmask),Bmask(Bmask),Amask(Amask){}
+    };
     struct TextureReference{
         GLuint tex;
     };
@@ -76,8 +84,22 @@ class TextureSystem: public entityx::System<TextureSystem>,public entityx::Recei
         }
         else{
             SDL_Log("NO PALETTE!");
-            
-            glTexImage2D(GL_TEXTURE_2D, 0, format, image->w, image->h, 0,format, GL_UNSIGNED_BYTE, image->pixels);
+            SDL_Log("GL_TEXTURE_2D format: %i,width: %i,height: %i",format,image->w,image->h);
+
+            unsigned char* pixels = new unsigned char[image->w * 4];
+            if(image->h == 0){
+                    for(int i = 0;i < image->w * image->format->BytesPerPixel;i += 4){
+                    SDL_Log("COLOR: %i,%i,%i,%i",((unsigned char*)image->pixels)[i],((unsigned char*)image->pixels)[i+1],((unsigned char*)image->pixels)[i+2],((unsigned char*)image->pixels)[i+3]);
+                    //ARGB => RGBA
+                    pixels[i] = /*((unsigned char*)image->pixels)[i+1]*/0xff;
+                    pixels[i+1] = /*((unsigned char*)image->pixels)[i+2]*/0xff;
+                    pixels[i+2] = /*((unsigned char*)image->pixels)[i+3]*/0xff;
+                    pixels[i+3] = /*((unsigned char*)image->pixels)[i]*/0xff;
+                }
+                glTexImage2D(GL_TEXTURE_2D, 0, format, image->h / 2, image->w, 0,format, GL_UNSIGNED_BYTE,pixels);
+                SDL_Log("ERROR? %i",glGetError());
+            }else 
+              glTexImage2D(GL_TEXTURE_2D, 0, format, image->w, image->h, 0,format, GL_UNSIGNED_BYTE,image->pixels);
             
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
@@ -86,7 +108,8 @@ class TextureSystem: public entityx::System<TextureSystem>,public entityx::Recei
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
         }
         SDL_FreeSurface(image);
-        entity.component<gel::Texture>().remove();
+        if(entity.component<gel::Texture>()) entity.component<gel::Texture>().remove();
+        else entity.component<gel::TextureData>().remove();
         entity.assign<gel::TextureReference>(ref);
     }
 public:
@@ -110,6 +133,14 @@ public:
         });
         entities.each<gel::Texture>([](entityx::Entity entity,gel::Texture& texture) {
             SDL_Surface* image = IMG_Load(texture.filename.c_str());        
+            loadTexture(image,entity);
+        });
+        entities.each<gel::TextureData>([](entityx::Entity entity,gel::TextureData& texture) {
+            SDL_Surface* image = SDL_CreateRGBSurfaceFrom(texture.pixels,texture.width,texture.height,texture.depth,texture.pitch,
+                                      texture.Rmask,texture.Gmask,texture.Bmask,texture.Amask);
+            if(image == NULL)
+                SDL_Log("Surface load from memory failed!");
+            else SDL_Log("Surface load from memory success!");
             loadTexture(image,entity);
         });
     }

@@ -37,10 +37,20 @@ SOFTWARE.*/
 #include <assimp/postprocess.h>
 
 glm::mat4 getMat4x4(aiMatrix4x4 transform){
-    return glm::mat4(transform.a1,transform.a2,transform.a3,transform.a4,
+    aiVector3D scaling,position;
+    aiQuaternion rotation;
+    transform.Decompose(scaling,rotation,position);
+    /*SDL_Log("SCALE IS: %f,%f,%f",scaling.x,scaling.y,scaling.z);
+    SDL_Log("POSITION IS: %f,%f,%f",position.x,position.y,position.z);
+    SDL_Log("ROTATION IS: %f,%f,%f,%f",rotation.x,rotation.y,rotation.z,rotation.w);*/
+    glm::quat quat = glm::quat(rotation.w,rotation.x,rotation.y,rotation.z);
+    glm::mat4 toReturn = glm::mat4(transform.a1,transform.a2,transform.a3,transform.a4,
                      transform.b1,transform.b2,transform.b3,transform.b4,
                      transform.c1,transform.c2,transform.c3,transform.c4,
                      transform.d1,transform.d2,transform.d3,transform.d4);
+    return glm::transpose(toReturn);
+    //glm::scale(glm::vec3(scaling.x,scaling.y,scaling.z)) * glm::mat4_cast(quat) * glm::translate(glm::vec3(position.x,position.y,position.z));
+    /*return toReturn;*/
 }
 
 void processNode(aiNode* node,AssetSystem& assets,std::vector<gel::Asset<gel::TextureReference>>& texture,
@@ -49,18 +59,21 @@ void processNode(aiNode* node,AssetSystem& assets,std::vector<gel::Asset<gel::Te
     std::vector<std::string>& meshNames){
 
     SDL_Log("NUM MESHES: %i",node->mNumMeshes);
-    glm::mat4 transform = parent_transform;
-    //if(node->mParent) transform = getMat4x4(node->mParent->mTransformation)  * getMat4x4(node->mTransformation);
-    SDL_Log("{%f,%f,%f,%f,",transform[0][0],transform[0][1],transform[0][2],transform[0][3]);
-    SDL_Log(" %f,%f,%f,%f,",transform[1][0],transform[1][1],transform[1][2],transform[1][3]);
-    SDL_Log(" %f,%f,%f,%f,",transform[2][0],transform[2][1],transform[2][2],transform[2][3]);
-    SDL_Log(" %f,%f,%f,%f}",transform[3][0],transform[3][1],transform[3][2],transform[3][3]);
+    glm::mat4 transform = parent_transform/*,local_transform = getMat4x4(node->mTransformation),
+    my_transform = glm::scale(glm::vec3(local_transform[0][0],local_transform[1][1],local_transform[2][2]));
+    if(node->mParent && node->mNumMeshes > 0) transform = getMat4x4(node->mParent->mTransformation)  * local_transform;
+    else if(node->mNumMeshes > 0) transform = local_transform*/;
+    /*SDL_Log("{%f,%f,%f,%f,",local_transform[0][0],local_transform[0][1],local_transform[0][2],local_transform[0][3]);
+    SDL_Log(" %f,%f,%f,%f,",local_transform[1][0],local_transform[1][1],local_transform[1][2],local_transform[1][3]);
+    SDL_Log(" %f,%f,%f,%f,",local_transform[2][0],local_transform[2][1],local_transform[2][2],local_transform[2][3]);
+    SDL_Log(" %f,%f,%f,%f}",local_transform[3][0],local_transform[3][1],local_transform[3][2],local_transform[3][3]);*/
     for(int i = 0;i < node->mNumMeshes;i++){
         for(gel::Asset<gel::VertexReference> vert:vertex[node->mMeshes[i]]){
-           gel::Asset<gel::Mesh> mesh = assets.load<gel::Mesh,gel::Mesh>(meshNames[node->mMeshes[i]])
-                .assign(transform).assign(glm::vec4(1.0f,1.0f,1.0f,1.0f))
+           gel::Asset<gel::Mesh> mesh = assets.load<gel::Mesh,gel::Mesh>(meshNames[node->mMeshes[i]],getMat4x4(node->mTransformation))
+                .assign(glm::mat4()).assign(glm::vec4(1.0f,1.0f,1.0f,1.0f))
                 .assign(shader).assign(vert);
-           if(texture.size() > 0) mesh.assign(texture[materialIndex[i][node->mMeshes[i]]]);
+                SDL_Log("TEXTURE AT MATERIAL INDEX: %i",materialIndex[i][0]);
+           if(texture.size() > 0) mesh.assign(texture[materialIndex[i][0]]);
            meshes.push_back(mesh);
         }
     }
@@ -71,12 +84,41 @@ void processNode(aiNode* node,AssetSystem& assets,std::vector<gel::Asset<gel::Te
 void processModel(const aiScene* scene,AssetSystem& assets,gel::Asset<gel::ShaderProgram>& shader,glm::mat4 transform,
     std::vector<gel::Asset<gel::Mesh>>& meshes){
     SDL_Log(">>aiScene<< HasMeshes: %s",scene->HasMeshes() == true?"true":"false");
+    SDL_Log(">>aiScene<< mNumTextures: %i",scene->mNumTextures);
+
     std::vector<gel::Asset<gel::TextureReference>> texture;
     std::vector<std::vector<unsigned int>> materialIndex;
+    //TODO: Load internal textures, if applicable.
+    for(int i = 0;i < scene->mNumTextures;i++){
+        aiTexture* tex = scene->mTextures[i];
+        SDL_Log(">>aiTexture<< height: %i,width: %i, format: %s",tex->mHeight,tex->mWidth,tex->achFormatHint);
+        char bitmap[tex->mWidth];
+        for(int i = 0;i < tex->mWidth;i += 4){
+            bitmap[i] = tex->pcData[i].a;
+            bitmap[i+1] = tex->pcData[i].r;
+            bitmap[i+2] = tex->pcData[i].g;
+            bitmap[i+3] = tex->pcData[i].b;
+        }
+        texture.push_back(assets.load<gel::TextureReference,gel::TextureData>((void*)bitmap,tex->mWidth,tex->mHeight,32,4 * tex->mWidth,
+          0x00ff0000,0x0000ff00,0x000000ff,0xff000000));
+    }
+
     //Load Materials.
     for(int i = 0;i < scene->mNumMaterials;i++){
         aiString* path = new aiString;
-        SDL_Log("DIFFUSE TEXTURES: %i",scene->mMaterials[i]->GetTextureCount(aiTextureType_DIFFUSE));
+       /* SDL_Log("DIFFUSE TEXTURES: %i",scene->mMaterials[i]->GetTextureCount(aiTextureType_DIFFUSE));
+        SDL_Log("UNKNOWN TEXTURES: %i",scene->mMaterials[i]->GetTextureCount(aiTextureType_UNKNOWN));
+        SDL_Log("SPECULAR TEXTURES: %i",scene->mMaterials[i]->GetTextureCount(aiTextureType_SPECULAR));
+        SDL_Log("AMBIENT TEXTURES: %i",scene->mMaterials[i]->GetTextureCount(aiTextureType_AMBIENT));
+        SDL_Log("EMISSIVE TEXTURES: %i",scene->mMaterials[i]->GetTextureCount(aiTextureType_EMISSIVE));
+        SDL_Log("HEIGHT TEXTURES: %i",scene->mMaterials[i]->GetTextureCount(aiTextureType_HEIGHT));
+        SDL_Log("NORMALS TEXTURES: %i",scene->mMaterials[i]->GetTextureCount(aiTextureType_NORMALS));
+        SDL_Log("SHININESS TEXTURES: %i",scene->mMaterials[i]->GetTextureCount(aiTextureType_SHININESS));
+        SDL_Log("OPACITY TEXTURES: %i",scene->mMaterials[i]->GetTextureCount(aiTextureType_OPACITY));
+        SDL_Log("DISPLACEMENT TEXTURES: %i",scene->mMaterials[i]->GetTextureCount(aiTextureType_DISPLACEMENT));
+        SDL_Log("LIGHTMAP TEXTURES: %i",scene->mMaterials[i]->GetTextureCount(aiTextureType_LIGHTMAP));
+        SDL_Log("REFLECTION TEXTURES: %i",scene->mMaterials[i]->GetTextureCount(aiTextureType_REFLECTION));
+        SDL_Log("NONE TEXTURES: %i",scene->mMaterials[i]->GetTextureCount(aiTextureType_NONE));*/
         if(scene->mMaterials[i]->GetTextureCount(aiTextureType_DIFFUSE) > 0){
             scene->mMaterials[i]->GetTexture(aiTextureType_DIFFUSE,0,path);
             SDL_Log("DIFFUSE TEXTURE PATH: %s",path->C_Str());
@@ -84,6 +126,10 @@ void processModel(const aiScene* scene,AssetSystem& assets,gel::Asset<gel::Shade
             stream << "assets/model/" << path->C_Str();
             texture.push_back(assets.load<gel::TextureReference,gel::Texture>(stream.str().c_str()));
         }
+
+        aiColor3D color (0.f,0.f,0.f);
+        scene->mMaterials[i]->Get(AI_MATKEY_COLOR_DIFFUSE,color);
+       // SDL_Log("DIFFUSE COLOR IS: %f,%f,%f",color.r,color.g,color.b);
     }
 
     //Load Meshes.
@@ -91,32 +137,42 @@ void processModel(const aiScene* scene,AssetSystem& assets,gel::Asset<gel::Shade
     std::vector<std::string> meshNames;
     for(int i = 0;i < scene->mNumMeshes;i++){
         SDL_Log(">>aiMesh<< mName: %s",scene->mMeshes[i]->mName.C_Str());
+        SDL_Log(">>aiMesh<< hasVertexColors? %s",scene->mMeshes[i]->HasVertexColors(0)?"yes":"no");
+        SDL_Log(">>aiMesh<< hasTextureCoords? %s",scene->mMeshes[i]->HasTextureCoords(0)?"yes":"no");
         //SDL_Log(">>aiMesh<< mNumFaces: %i",scene->mMeshes[i]->mNumFaces);
         //SDL_Log(">>aiMesh<< mNumUVComponents: %i",*scene->mMeshes[i]->mNumUVComponents);
         std::vector<gel::Asset<gel::VertexReference>> vertex;
         std::vector<unsigned int> material;
         std::vector<GLfloat> vertices;
+        glm::vec3 centroid = glm::vec3(0,0,0);
         for(int j = 0;j < scene->mMeshes[i]->mNumVertices;j++){
             vertices.push_back(scene->mMeshes[i]->mVertices[j].x);
             vertices.push_back(scene->mMeshes[i]->mVertices[j].y);
             vertices.push_back(scene->mMeshes[i]->mVertices[j].z);
-            if(texture.size() > 0){
+            if(texture.size() > 0){//SDL_Log("UV COORDS: %f,%f",scene->mMeshes[i]->mTextureCoords[0][j].x,scene->mMeshes[i]->mTextureCoords[0][j].y);
                 vertices.push_back(scene->mMeshes[i]->mTextureCoords[0][j].x);
                 vertices.push_back(scene->mMeshes[i]->mTextureCoords[0][j].y);
             }
         }
-        for(int j = 0;j < scene->mMeshes[i]->mNumFaces;j++){
-            std::vector<GLuint> indices;
+        
+        std::vector<GLuint> indices;
+        for(int j = 0;j < scene->mMeshes[i]->mNumFaces;j++){ 
             //SDL_Log(">>aiFace<< mNumIndices: %i",scene->mMeshes[i]->mFaces[j].mNumIndices);
-            for(int k = 0;k < scene->mMeshes[i]->mFaces[j].mNumIndices;k++)
+            for(int k = 0;k < scene->mMeshes[i]->mFaces[j].mNumIndices;k++){
                 indices.push_back(scene->mMeshes[i]->mFaces[j].mIndices[k]);
-            std::vector<gel::VertexSpec> spec = std::vector<gel::VertexSpec>{gel::POSITION};
-            if(texture.size() > 0){
-                spec.push_back(gel::TEXTURE_0);
-                material.push_back(scene->mMeshes[i]->mMaterialIndex);
             }
-            vertex.push_back(assets.load<gel::VertexReference,gel::Vertex>(spec,vertices,indices).assign(shader));
         }
+
+        std::vector<gel::VertexSpec> spec = std::vector<gel::VertexSpec>{gel::POSITION};
+        if(texture.size() > 0){
+            spec.push_back(gel::TEXTURE_0);
+            /*HACK*/
+            if(scene->mMeshes[i]->mMaterialIndex > texture.size()-1 || scene->mMeshes[i]->mMaterialIndex < 0) scene->mMeshes[i]->mMaterialIndex = 0;
+            /*HACK*/
+            material.push_back(scene->mMeshes[i]->mMaterialIndex);
+        }
+        vertex.push_back(assets.load<gel::VertexReference,gel::Vertex>(spec,vertices,indices).assign(shader));
+        
         vertexGroup.push_back(vertex);
         materialIndex.push_back(material);
         meshNames.push_back(scene->mMeshes[i]->mName.C_Str());
