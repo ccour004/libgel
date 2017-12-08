@@ -22,7 +22,8 @@ SOFTWARE.*/
 
 #include <Application.hpp>
 #include <memory>
-#include "MyAppListener.hpp"
+//#include "MyAppListener.hpp"
+#include "glfAppListener.hpp"
 
 int main(int argc, char* argv[])
 {    
@@ -33,6 +34,6 @@ int main(int argc, char* argv[])
     mobile->setBetterAntiAlias();
     
     std::unique_ptr<gel::Application> app = std::make_unique<gel::Application>(
-        desktop,mobile,std::make_shared<MyAppListener>());
+        desktop,mobile,std::make_shared</*MyAppListener*/glfAppListener>());
     return 0;
 }
