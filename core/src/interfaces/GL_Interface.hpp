@@ -37,6 +37,8 @@ SOFTWARE.*/
 #include "json.hpp"
 
 namespace gel{
+    struct camera;
+    void renderCamera(camera& camera);
     //TODO: fill out all of these structs w/ params based on glTF spec
     struct buffer{
         buffer(){}
@@ -84,6 +86,46 @@ namespace gel{
         glm::vec3 translation = glm::vec3(0,0,0),scale = glm::vec3(1,1,1);
         std::vector<int> children;
     };
+    struct orthographic{
+        orthographic():xmag(1),ymag(1),zfar(100.0f),znear(0.1f){}
+        orthographic(float xmag,float ymag,float znear,float zfar):xmag(xmag),ymag(ymag),zfar(zfar),znear(znear){}
+        float xmag,ymag,zfar,znear;
+    };
+    struct perspective{
+        perspective():aspectRatio(1.333f),yfov(glm::radians(45.0f)),zfar(-1),znear(0.1f){}
+        perspective(float aspectRatio,float yfov,float znear,float zfar):aspectRatio(aspectRatio),yfov(glm::radians(yfov)),zfar(zfar),znear(znear){}
+        float aspectRatio,yfov,zfar,znear;
+    };
+    struct camera{
+        camera():type("perspective"){renderCamera(*this);}
+        camera(gel::orthographic ortho):type("orthographic"),orthographic(ortho){renderCamera(*this);}
+        camera(gel::perspective persp):type("perspective"),perspective(persp){renderCamera(*this);}
+        void setAspectRatio(float aspectRatio){perspective.aspectRatio = aspectRatio;renderCamera(*this);}
+        void setFov(float yfov){perspective.yfov = glm::radians(yfov);renderCamera(*this);}
+        float getFov(){return glm::degrees(perspective.yfov);}
+        void setXMag(float xmag){orthographic.xmag = xmag;renderCamera(*this);}
+        void setYMag(float ymag){orthographic.ymag = ymag;renderCamera(*this);}
+        void setZNear(float znear){if(type == "perspective")perspective.znear = znear;else orthographic.znear = znear;renderCamera(*this);}
+        void setZFar(float zfar){if(type == "perspective")perspective.zfar = zfar;else orthographic.zfar = zfar;renderCamera(*this);}
+        void setTranslate(glm::vec3 translate){this->translate = translate;renderCamera(*this);}
+        void addRotate(glm::vec3 axis,float amount){rotate = glm::rotate(rotate,amount,axis);renderCamera(*this);}
+        std::string type;
+        gel::perspective perspective;
+        gel::orthographic orthographic;
+        //Extra:
+        glm::vec3 translate;
+        glm::quat rotate;
+        glm::mat4 transform;
+    };
+    void renderCamera(gel::camera& camera){
+        if(camera.type == "perspective"){
+            gel::perspective persp = camera.perspective;
+            camera.transform = glm::perspective(persp.yfov,persp.aspectRatio,persp.znear,persp.zfar) * glm::translate(camera.translate) * glm::mat4_cast(camera.rotate);
+        }else{
+            gel::orthographic ortho = camera.orthographic;
+            camera.transform = glm::ortho(-ortho.xmag,ortho.xmag,-ortho.ymag,ortho.ymag,ortho.znear,ortho.zfar) * glm::translate(camera.translate) * glm::mat4_cast(camera.rotate);
+        }
+    }
     struct sampler{
         sampler(){}
         int input,output;
@@ -403,23 +445,20 @@ void renderChannel(float curr,gel::animation& animation,int i,gel::model& model)
 }
 
 float curr = 0.0f;
-void renderNode(gel::model& model,gel::ShaderProgram& shader,gel::node& node,float zoom,glm::mat4 parent){
+void renderNode(gel::model& model,gel::ShaderProgram& shader,gel::node& node,gel::camera& camera,glm::mat4 parent){
     parent = parent * node.matrix * glm::translate(node.translation) 
         * glm::mat4_cast(glm::quat(node.rotation[3],node.rotation[0],node.rotation[1],node.rotation[2])) 
         * glm::scale(node.scale);
-    shader.setUniform("u_projView",
-        /*glm::ortho(0.0f,5.0f,5.0f,0.0f,0.1f,100.0f)*/glm::perspective(glm::radians(zoom),640.0f/480.0f,0.1f,100.0f)
-        * glm::translate(glm::vec3(0,0,-10)) * parent,false);
+    shader.setUniform("u_projView",camera.transform * parent,false);
     if(node.mesh != -1)
          renderMesh(model.meshes[node.mesh],shader,model);
     //Render all child nodes, if any.
     for(int i = 0;i < node.children.size();i++)
-        renderNode(model,shader,model.nodes[node.children[i]],zoom,parent);
+        renderNode(model,shader,model.nodes[node.children[i]],camera,parent);
 }
 
-void renderModel(gel::model& model,gel::ShaderProgram& shader,float zoom){
+void renderModel(gel::model& model,gel::ShaderProgram& shader,gel::camera& camera){
     glm::mat4 parent;
-   // parent *= glm::rotate(curr,glm::vec3(0,1,0));
 
     //Render any animation channels.
     for(int i = 0;i < model.animations.size();i++)
@@ -432,6 +471,6 @@ void renderModel(gel::model& model,gel::ShaderProgram& shader,float zoom){
     //Render nodes.
     for(gel::scene scene:model.scenes)
     for(int i = 0;i < scene.nodes.size();i++)
-        renderNode(model,shader,model.nodes[scene.nodes[i]],zoom,parent);
+        renderNode(model,shader,model.nodes[scene.nodes[i]],camera,parent);
     shader.end();
 }

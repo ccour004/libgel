@@ -39,8 +39,10 @@ std::map<SDL_Keycode,bool> keyMap;
 
 #include "interfaces/GL_Interface.hpp"
 
-float zoom = 45.0f;
+gel::camera camera;
 class MyRawInputProcessor: public gel::RawInputProcessor{
+    bool drag = false;
+    float speed = 0.01f;
 public:
     bool controllerAxisEvent(const SDL_ControllerAxisEvent& event){
         SDL_Log("[SDL_ControllerAxisEvent] axis: %i,value: %i",event.axis,event.value);
@@ -88,18 +90,20 @@ public:
 
     bool mouseMotionEvent(const SDL_MouseMotionEvent& event){
         //SDL_Log("[SDL_MOUSEMOTIONEVENT]: %i,%i",event.xrel,event.yrel);
-        if(RenderSystem::drag) RenderSystem::rotateAmount += event.xrel;
+        if(drag){
+            camera.addRotate(glm::vec3(0,1,0),event.xrel * speed);
+            //camera.addRotate(glm::vec3(1,0,0),event.yrel * speed);
+        }
         return true;
     }
     
     bool mouseButtonEvent(const SDL_MouseButtonEvent& event){
         switch(event.type){
             case SDL_MOUSEBUTTONDOWN: //SDL_Log("[SDL_MOUSEBUTTONDOWN]: %i,%i",event.x,event.y);
-                RenderSystem::drag = true;
+                drag = true;
                 break; 
             case SDL_MOUSEBUTTONUP: //SDL_Log("[SDL_MOUSEBUTTONUP]");
-                RenderSystem::drag = false;
-                RenderSystem::rotateAmount = 0.0f;
+                drag = false;
                 break;
         }
         return true;
@@ -107,7 +111,7 @@ public:
     
     bool mouseWheelEvent(const SDL_MouseWheelEvent& event){
         //SDL_Log("[SDL_MOUSEWHEELEVENT]: %i",event.y);
-        zoom = glm::clamp(zoom - event.y,30.0f,120.0f/*90.0f*/);
+        camera.setFov(glm::clamp(camera.getFov() - event.y,30.0f,120.0f/*90.0f*/));
         return true;
     }
     
@@ -154,6 +158,8 @@ public:
     });
 
     //glTF TEST
+    camera = gel::camera(gel::perspective(640.0f/480.0f,45.0f,0.1f,100.0f));
+    camera.setTranslate(glm::vec3(0,0,-10));
     fillWithJSON(model,"assets/BoxAnimated.gltf");
     locations["POSITION"] = 0;
     loadModel(model,"assets/",locations);
@@ -170,7 +176,7 @@ void render(){
     //glTF TEST
     glViewport(0,0,640,480);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    renderModel(model,*altShader.component<gel::ShaderProgram>(),zoom);
+    renderModel(model,*altShader.component<gel::ShaderProgram>(),camera);
     //glTF TEST
 }
 
