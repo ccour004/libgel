@@ -34,9 +34,14 @@ SOFTWARE.*/
 #include <glm/gtc/quaternion.hpp>
 #include <glm/gtx/transform.hpp>
 #include <glm/gtx/compatibility.hpp>
+#include <glm/gtc/type_ptr.hpp>
 #include "json.hpp"
 
+#define BUFFER_OFFSET(idx) (static_cast<char*>(0) + (idx))
+
 namespace gel{
+    #define FRAGMENT_SHADER 35632
+    #define VERTEX_SHADER 35633
     struct camera;
     void renderCamera(camera& camera);
     //TODO: fill out all of these structs w/ params based on glTF spec
@@ -70,6 +75,7 @@ namespace gel{
         primitive(std::map<std::string,int> attributes,int indices = -1):attributes(attributes),indices(indices){}
         std::map<std::string,int> attributes;
         int indices;
+        int material = 0,mode = 4;
         //Extra:
         unsigned int bufferReference;
     };
@@ -77,6 +83,7 @@ namespace gel{
         mesh(){}
         mesh(std::vector<gel::primitive> primitives):primitives(primitives){}
         std::vector<gel::primitive> primitives;
+        //TODO: finish
     };
     struct node{
         node(){}
@@ -100,7 +107,7 @@ namespace gel{
         camera():type("perspective"){renderCamera(*this);}
         camera(gel::orthographic ortho):type("orthographic"),orthographic(ortho){renderCamera(*this);}
         camera(gel::perspective persp):type("perspective"),perspective(persp){renderCamera(*this);}
-        void setAspectRatio(float aspectRatio){perspective.aspectRatio = aspectRatio;renderCamera(*this);}
+        void setAspectRatio(float width,float height){perspective.aspectRatio = width/height;glViewport(0,0,width,height);renderCamera(*this);}
         void setFov(float yfov){perspective.yfov = glm::radians(yfov);renderCamera(*this);}
         float getFov(){return glm::degrees(perspective.yfov);}
         void setXMag(float xmag){orthographic.xmag = xmag;renderCamera(*this);}
@@ -108,7 +115,7 @@ namespace gel{
         void setZNear(float znear){if(type == "perspective")perspective.znear = znear;else orthographic.znear = znear;renderCamera(*this);}
         void setZFar(float zfar){if(type == "perspective")perspective.zfar = zfar;else orthographic.zfar = zfar;renderCamera(*this);}
         void setTranslate(glm::vec3 translate){this->translate = translate;renderCamera(*this);}
-        void addRotate(glm::vec3 axis,float amount){rotate = glm::rotate(rotate,amount,axis);renderCamera(*this);}
+        void setRotate(float rotateX,float rotateY,float rotateZ){rotate = glm::quat(glm::vec3(rotateY,rotateX,rotateZ));renderCamera(*this);}
         std::string type;
         gel::perspective perspective;
         gel::orthographic orthographic;
@@ -126,8 +133,8 @@ namespace gel{
             camera.transform = glm::ortho(-ortho.xmag,ortho.xmag,-ortho.ymag,ortho.ymag,ortho.znear,ortho.zfar) * glm::translate(camera.translate) * glm::mat4_cast(camera.rotate);
         }
     }
-    struct sampler{
-        sampler(){}
+    struct animation_sampler{
+        animation_sampler(){}
         int input,output;
         std::string interpolation;
     };
@@ -143,13 +150,79 @@ namespace gel{
     };
     struct animation{
         animation(){}
-        std::vector<gel::sampler> samplers;
+        std::vector<gel::animation_sampler> samplers;
         std::vector<gel::channel> channels;
     };
     struct scene{
         scene(){}
         std::vector<int> nodes;
     };
+    struct textureInfo{
+        int index,texCoord;
+    };
+    struct pbrMetallicRoughness{
+        pbrMetallicRoughness(){}
+        std::vector<float> baseColorFactor;
+        gel::textureInfo baseColorTexture,metallicRoughnessTexture;
+        float metallicFactor,roughnessFactor;
+    };
+    struct material{
+        material(){}
+        gel::pbrMetallicRoughness pbrMetallicRoughness;
+        /*gel::normalTextureInfo normalTexture;
+        gel::occlusionTextureInfo occlusionTexture;
+        gel::textureInfo emissiveTexture;
+        std::vector<float> emissiveFactor;
+        std::string alphaMode;
+        float alphaCutoff;
+        bool doubleSided;*/
+        int technique;
+    };
+    struct shader{
+        shader(){}
+        shader(std::string uri,int type):uri(uri),type(type){}
+        std::string uri;
+        int type,bufferView;
+        //Extra:
+        unsigned int shaderReference;
+    };
+    struct program{
+        program(){}
+        program(int vertexShader,int fragmentShader,std::vector<std::string> attributes):vertexShader(vertexShader),fragmentShader(fragmentShader),attributes(attributes){}
+        std::vector<std::string> attributes;
+        int vertexShader,fragmentShader;
+        //Extra:
+        unsigned int programReference;
+    };
+    struct technique_parameters{
+        technique_parameters(){}
+        technique_parameters(std::string semantic,int type):semantic(semantic),type(type){}
+        int count,node,type;
+        std::string semantic;
+        //std::vector<void*> value; //Determined by type/count.
+        //Extra:
+        unsigned int parameterReference;
+    };
+
+    struct technique{
+        technique(){}
+        technique(std::map<std::string,std::string> attributes,std::map<std::string,std::string> uniforms,
+            std::map<std::string,gel::technique_parameters> parameters,int program):attributes(attributes),uniforms(uniforms),parameters(parameters),program(program){}
+        int program;
+        std::map<std::string,gel::technique_parameters> parameters;
+        std::map<std::string,std::string> attributes;
+        std::map<std::string,std::string> uniforms;
+        //gel::technique_states states;
+    };
+
+    struct texture{
+        //TODO: finish
+    };
+
+    struct sampler{
+        //TODO: finish
+    };
+
     struct model{
         model(){}
         std::vector<gel::scene> scenes;
@@ -159,7 +232,60 @@ namespace gel{
         std::vector<gel::buffer> buffers;
         std::vector<gel::bufferView> bufferViews;
         std::vector<gel::accessor> accessors;
+        std::vector<gel::material> materials;
+        std::vector<gel::shader> shaders;
+        std::vector<gel::texture> textures;
+        std::vector<gel::sampler> samplers;
+        std::vector<gel::program> programs;
+        std::vector<gel::technique> techniques;
     };
+
+    void from_json(const nlohmann::json& j, gel::technique_parameters& technique_parameters){
+        if(j.find("type") != j.end()) technique_parameters.type = j.at("type").get<int>();
+        if(j.find("count") != j.end()) technique_parameters.count = j.at("count").get<int>();
+        if(j.find("node") != j.end()) technique_parameters.node = j.at("node").get<int>();
+        if(j.find("semantic") != j.end()) technique_parameters.semantic = j.at("semantic").get<std::string>();
+        //TODO: value
+    }
+
+    void from_json(const nlohmann::json& j, gel::technique& technique){
+        technique.program = j.at("program").get<int>();
+        if(j.find("attributes") != j.end()) technique.attributes = j.at("attributes").get<std::map<std::string,std::string>>();
+        if(j.find("uniforms") != j.end()) technique.uniforms = j.at("uniforms").get<std::map<std::string,std::string>>();
+        if(j.find("parameters") != j.end()) technique.parameters = j.at("parameters").get<std::map<std::string,gel::technique_parameters>>();
+    }
+
+    void from_json(const nlohmann::json& j, gel::program& program){
+        if(j.find("attributes") != j.end()) program.attributes = j.at("attributes").get<std::vector<std::string>>();
+        program.vertexShader = j.at("vertexShader").get<int>();
+        program.fragmentShader = j.at("fragmentShader").get<int>();
+    }
+
+    void from_json(const nlohmann::json& j, gel::shader& shader){
+        if(j.find("uri") != j.end()) shader.uri = j.at("uri").get<std::string>();
+        shader.type = j.at("type").get<int>();
+        if(j.find("bufferView") != j.end()) shader.bufferView = j.at("bufferView").get<int>();
+    }
+
+    void from_json(const nlohmann::json& j, gel::textureInfo& textureInfo){
+        if(j.find("index") != j.end()) textureInfo.index = j.at("index").get<int>();
+        if(j.find("texCoord") != j.end()) textureInfo.index = j.at("texCoord").get<int>();
+    }
+
+    void from_json(const nlohmann::json& j, gel::pbrMetallicRoughness& material){
+        if(j.find("metallicFactor") != j.end()) material.metallicFactor = j.at("metallicFactor").get<float>();
+        if(j.find("roughnessFactor") != j.end()) material.roughnessFactor = j.at("roughnessFactor").get<float>();
+        if(j.find("baseColorFactor") != j.end()) material.baseColorFactor = j.at("baseColorFactor").get<std::vector<float>>();
+        if(j.find("baseColorTexture") != j.end()) material.baseColorTexture = j.at("baseColorTexture").get<gel::textureInfo>();
+        if(j.find("metallicRoughnessTexture") != j.end()) material.metallicRoughnessTexture = j.at("metallicRoughnessTexture").get<gel::textureInfo>();
+        //TODO: fill out the rest
+    }   
+
+    void from_json(const nlohmann::json& j, gel::material& material){
+        if(j.find("pbrMetallicRoughness") != j.end()) material.pbrMetallicRoughness = j.at("pbrMetallicRoughness").get<gel::pbrMetallicRoughness>();
+        if(j.find("technique") != j.end()) material.technique = j.at("technique").get<int>(); else material.technique = 0;
+        //TODO: fill out the rest
+    }    
 
     void from_json(const nlohmann::json& j, gel::channel_target& target){
         target.node = j.at("node").get<int>();
@@ -171,14 +297,14 @@ namespace gel{
         channel.target = j.at("target").get<gel::channel_target>();
     }
 
-    void from_json(const nlohmann::json& j, gel::sampler& sampler){
+    void from_json(const nlohmann::json& j, gel::animation_sampler& sampler){
         sampler.input = j.at("input").get<int>();
         sampler.output = j.at("output").get<int>();
         sampler.interpolation = j.at("interpolation").get<std::string>();
     }
 
     void from_json(const nlohmann::json& j, gel::animation& animation){
-        animation.samplers = j.at("samplers").get<std::vector<gel::sampler>>();
+        animation.samplers = j.at("samplers").get<std::vector<gel::animation_sampler>>();
         animation.channels = j.at("channels").get<std::vector<gel::channel>>();
     }
 
@@ -230,10 +356,13 @@ namespace gel{
     void from_json(const nlohmann::json& j, gel::primitive& primitive){
         primitive.attributes = j.at("attributes").get<std::map<std::string,int>>();
         if(j.find("indices") != j.end()) primitive.indices = j.at("indices").get<int>();
+        if(j.find("material") != j.end()) primitive.material = j.at("material").get<int>(); else primitive.material = 0;
+        //TODO: finish
     }
 
     void from_json(const nlohmann::json& j, gel::mesh& mesh){
         mesh.primitives = j.at("primitives").get<std::vector<gel::primitive>>();
+        //TODO: finish
     }
 
     void from_json(const nlohmann::json& j, gel::accessor& accessor){
@@ -250,8 +379,25 @@ namespace gel{
         model.bufferViews = j.at("bufferViews").get<std::vector<gel::bufferView>>();
         model.accessors = j.at("accessors").get<std::vector<gel::accessor>>();
         model.meshes = j.at("meshes").get<std::vector<gel::mesh>>();
+        model.materials = j.at("materials").get<std::vector<gel::material>>();
         if(j.find("animations") != j.end()) model.animations = j.at("animations").get<std::vector<gel::animation>>();
+        if(j.find("shaders") != j.end()) model.shaders = j.at("shaders").get<std::vector<gel::shader>>();
         model.nodes = j.at("nodes").get<std::vector<gel::node>>();
+
+        //Default shader/program/technique values in case they're missing from the model (they're extensions["KHR_technique_webgl"] atm, anyhow):
+        model.shaders.push_back(gel::shader("default.vert",VERTEX_SHADER));
+        model.shaders.push_back(gel::shader("default.frag",FRAGMENT_SHADER));
+        model.programs.push_back(gel::program(model.shaders.size()-2,model.shaders.size()-1,std::vector<std::string>{
+            "a_position"
+        }));
+        std::map<std::string,std::string> attributes,uniforms;
+        std::map<std::string,gel::technique_parameters> parameters;
+        attributes["a_position"] = "position";
+        parameters["projectionMatrix"] = gel::technique_parameters("PROJECTION",35676);
+        parameters["position"] = gel::technique_parameters("POSITION",35665);
+        uniforms["u_projView"] = "projectionMatrix";
+        //TODO: fill out for default technique
+        model.techniques.push_back(gel::technique(attributes,uniforms,parameters,0));
     }
 }
 
@@ -329,8 +475,7 @@ void loadAccessor(const gel::accessor& accessor,const gel::bufferView& bufferVie
     glVertexAttribPointer(location,size,type,false,bufferView.byteStride,BUFFER_OFFSET(accessor.byteOffset));
 }
 
-void loadPrimitive(gel::primitive& primitive,const std::vector<gel::bufferView>& bufferViews,std::vector<gel::accessor>& accessors,
-        std::map<std::string,unsigned int>& locations){
+void loadPrimitive(gel::primitive& primitive,const std::vector<gel::bufferView>& bufferViews,std::vector<gel::accessor>& accessors,gel::model& model){
     //Start vertex array for holding vbo/ibo state.
     glGenVertexArrays(1,&primitive.bufferReference);
     glBindVertexArray(primitive.bufferReference);
@@ -340,7 +485,15 @@ void loadPrimitive(gel::primitive& primitive,const std::vector<gel::bufferView>&
         gel::accessor accessor = accessors[attribute.second];
         gel::bufferView view = bufferViews[accessor.bufferView];
         glBindBuffer(GL_ARRAY_BUFFER,view.bufferReference);
-        loadAccessor(accessor,view,locations[attribute.first]);
+
+        //Find the attribute location via the technique.
+        std::map<std::string,gel::technique_parameters> parameters = model.techniques[model.materials[primitive.material].technique].parameters;
+        for(std::pair<std::string,gel::technique_parameters> parameter:parameters){
+            if(parameter.second.semantic == attribute.first){
+                loadAccessor(accessor,view,parameter.second.parameterReference);
+                break;
+            }
+        }
     }
 
     //Load index buffer if applicable.
@@ -349,9 +502,49 @@ void loadPrimitive(gel::primitive& primitive,const std::vector<gel::bufferView>&
     }
 }
 
-void loadMesh(gel::mesh& mesh,const std::vector<gel::bufferView>& bufferViews,std::vector<gel::accessor>& accessors,
-        std::map<std::string,unsigned int>& locations){
-    for(int i = 0;i < mesh.primitives.size();i++) loadPrimitive(mesh.primitives[i],bufferViews,accessors,locations);
+void loadTechnique(gel::technique& tech,std::vector<gel::program>& programs){
+    for(std::pair<std::string,std::string> element:tech.attributes)
+        tech.parameters[element.second].parameterReference = glGetAttribLocation(programs[tech.program].programReference,element.first.c_str());
+     for(std::pair<std::string,std::string> element:tech.uniforms)
+        tech.parameters[element.second].parameterReference = glGetUniformLocation(programs[tech.program].programReference,element.first.c_str());   
+    //TODO: finish
+}
+
+void loadProgram(gel::program& program,std::vector<gel::shader>& shaders){
+    SDL_Log("===LOADING PROGRAM");
+    program.programReference = glCreateProgram();
+    glAttachShader(program.programReference,shaders[program.vertexShader].shaderReference);
+    glAttachShader(program.programReference,shaders[program.fragmentShader].shaderReference);
+    glLinkProgram(program.programReference);
+    std::vector<int> results;results.push_back(0);
+    glGetProgramiv(program.programReference,GL_LINK_STATUS,&results[0]);
+    SDL_Log("===LINK STATUS IS: %i",results[0]);
+    if(results[0] == 0){
+        std::vector<char> log(256);
+        glGetProgramInfoLog(program.programReference,log.size(),NULL,&log[0]);
+        SDL_Log("---PROGRAM LINK STATUS IS: %s",std::string(log.data()).c_str());
+    }
+}
+
+void loadShader(std::string path,gel::shader& shader){
+    SDL_Log("===LOADING SHADER: %s",(path+shader.uri).c_str());
+    shader.shaderReference = glCreateShader(shader.type == VERTEX_SHADER?GL_VERTEX_SHADER:GL_FRAGMENT_SHADER);
+    std::vector<std::string> contents = std::vector<std::string>{"#version 300 es\n"+loadFileAsString(path+shader.uri)};
+    glShaderSource(shader.shaderReference,1,(const char* const*)&contents[0],NULL);
+    glCompileShader(shader.shaderReference);
+    std::vector<int> results;results.push_back(0);
+    glGetShaderiv(shader.shaderReference,GL_COMPILE_STATUS,&results[0]);
+    SDL_Log("===COMPILE STATUS IS: %i",results[0]);
+    if(results[0] == 0){
+        std::vector<char> log(256);
+        glGetShaderInfoLog(shader.shaderReference,log.size(),0,&log[0]);
+        SDL_Log("---SHADER COMPILE FAILED: %s,SOURCE DUMP: <<<%s>>>",std::string(log.data()).c_str(),loadFileAsString(path+shader.uri).c_str());
+    }
+}
+
+void loadMesh(gel::mesh& mesh,const std::vector<gel::bufferView>& bufferViews,std::vector<gel::accessor>& accessors,gel::model& model){
+    for(int i = 0;i < mesh.primitives.size();i++) loadPrimitive(mesh.primitives[i],bufferViews,accessors,model);
+    //TODO: finish
 }
 
 const void* getBufferPointer(const gel::bufferView& view,int offset,const std::vector<gel::buffer>& buffers){
@@ -360,7 +553,7 @@ const void* getBufferPointer(const gel::bufferView& view,int offset,const std::v
 
 std::vector<float> getBufferValue(const float* bufferPointer,int index,int size){
     std::vector<float> values;
-    SDL_Log("INDEX: %i,SIZE: %i",index,size);
+    //SDL_Log("INDEX: %i,SIZE: %i",index,size);
     for(int i = 0;i < size;i++) values.push_back(*(bufferPointer + index * size + i));
     return values;
 }
@@ -387,24 +580,140 @@ float getLinearBoundingValues(float currentVal,float& previous,float& next,int& 
     return currentVal;
 }
 
-void loadModel(gel::model& model,std::string path,std::map<std::string,unsigned int>& locations){
+void setShaderValue(void* value,gel::technique_parameters parameter,bool isAttribute){
+    if(parameter.parameterReference == -1) return; //Not found in shader.
+    switch(parameter.type){
+        case 5120://BYTE
+        //if(isAttribute) glVertexAttrib1b(parameter.parameterReference,*(char*)value);
+        //else            glUniform1b(parameter.parameterReference,*(char*)value);
+        break;
+        case 5121://UNSIGNED_BYTE
+        //if(isAttribute) glVertexAttrib1ub(parameter.parameterReference,*(unsigned char*)value);
+        //else            glUniform1ub(parameter.parameterReference,*(unsigned char*)value);
+        break;
+        case 5122://SHORT
+        //if(isAttribute) glVertexAttrib1s(parameter.parameterReference,*(short*)value);
+        //else            glUniform1s(parameter.parameterReference,*(short*)value);
+        break;
+        case 5123://UNSIGNED_SHORT
+        //if(isAttribute) glVertexAttrib1us(parameter.parameterReference,*(unsigned short*)value);
+        //else            glUniform1us(parameter.parameterReference,*(unsigned short*)value);
+        break;
+        case 5124://INT
+        if(isAttribute) /*glVertexAttrib1i(parameter.parameterReference,*(int*)value)*/;
+        else            glUniform1i(parameter.parameterReference,*(int*)value);
+        break;
+        case 5125://UNSIGNED_INT
+        if(isAttribute) /*glVertexAttribI1ui(parameter.parameterReference,*(unsigned int*)value)*/;
+        else            glUniform1ui(parameter.parameterReference,*(unsigned int*)value);
+        break;
+        case 5126://FLOAT
+        if(isAttribute) glVertexAttrib1f(parameter.parameterReference,*(float*)value);
+        else            glUniform1f(parameter.parameterReference,*(float*)value);
+        break;
+        case 35664://FLOAT_VEC2
+        if(isAttribute) glVertexAttrib2fv(parameter.parameterReference,(float*)value);
+        else            glUniform2fv(parameter.parameterReference,1,(float*)value);
+        break;
+        case 35665://FLOAT_VEC3
+        if(isAttribute) glVertexAttrib3fv(parameter.parameterReference,(float*)value);
+        else            glUniform3fv(parameter.parameterReference,1,(float*)value);
+        break;
+        case 35666://FLOAT_VEC4
+        if(isAttribute) glVertexAttrib4fv(parameter.parameterReference,(float*)value);
+        else            glUniform4fv(parameter.parameterReference,1,(float*)value);
+        break;
+        case 35667://INT_VEC2
+        if(isAttribute) /*glVertexAttribI2iv(parameter.parameterReference,(int*)value)*/;
+        else            glUniform2iv(parameter.parameterReference,1,(int*)value);
+        break;
+        case 35668://INT_VEC3
+        if(isAttribute) /*glVertexAttribI3iv(parameter.parameterReference,(int*)value)*/;
+        else            glUniform3iv(parameter.parameterReference,1,(int*)value);
+        break;
+        case 35669://INT_VEC4
+        if(isAttribute) /*glVertexAttribI4iv(parameter.parameterReference,(int*)value)*/;
+        else            glUniform4iv(parameter.parameterReference,1,(int*)value);
+        break;
+        /*case 35670://BOOL
+        break;
+        case 35671://BOOL_VEC2
+        break;
+        case 35672://BOOL_VEC3
+        break;
+        case 35673://BOOL_VEC4
+        break; */
+        case 35674://FLOAT_MAT2
+        if(isAttribute) /*TODO*/;
+        else            glUniformMatrix2fv(parameter.parameterReference,1,false,(float*)value);
+        break;
+        case 35675://FLOAT_MAT3
+        if(isAttribute) /*TODO*/;
+        else            glUniformMatrix3fv(parameter.parameterReference,1,false,(float*)value);
+        break;
+        case 35676://FLOAT_MAT4
+        if(isAttribute) /*TODO*/;
+        else            glUniformMatrix4fv(parameter.parameterReference,1,false,(float*)value);
+        break;
+        /*case 35678://SAMPLER_2D
+        //??? Need to figure out how/where in OpenGL this might be set.
+        break;*/
+    }
+}
+
+void loadTexture(gel::texture& texture){
+    //TODO: finish
+}
+
+void loadSampler(gel::sampler& sampler){
+    //TODO: finish
+}
+
+void loadMaterial(gel::material& material){
+    //TODO: finish
+}
+
+void loadModel(gel::model& model,std::string path){
     SDL_Log("+++LOADING BUFFERS...");
     for(int i = 0;i < model.buffers.size();i++) loadBuffer(path,model.buffers[i]);
     SDL_Log("+++LOADING BUFFER VIEWS...");
     for(int i = 0;i < model.bufferViews.size();i++) loadBufferView(model.bufferViews[i],model.buffers);
+    SDL_Log("+++LOADING TEXTURES...");
+    for(int i = 0;i < model.textures.size();i++) loadTexture(model.textures[i]);
+    SDL_Log("+++LOADING SAMPLERS...");
+    for(int i = 0;i < model.samplers.size();i++) loadSampler(model.samplers[i]);
+    SDL_Log("+++LOADING MATERIALS...");
+    for(int i = 0;i < model.materials.size();i++) loadMaterial(model.materials[i]);
+    SDL_Log("+++LOADING SHADERS...");
+    for(int i = 0;i < model.shaders.size();i++) loadShader(path,model.shaders[i]);
+    SDL_Log("+++LOADING PROGRAMS...");
+    for(int i = 0;i < model.programs.size();i++) loadProgram(model.programs[i],model.shaders);
+    SDL_Log("+++LOADING TECHNIQUES...");
+    for(int i = 0;i < model.techniques.size();i++) loadTechnique(model.techniques[i],model.programs);
     SDL_Log("+++LOADING MESHES...");
-    for(int i = 0;i < model.meshes.size();i++) loadMesh(model.meshes[i],model.bufferViews,model.accessors,locations);
+    for(int i = 0;i < model.meshes.size();i++) loadMesh(model.meshes[i],model.bufferViews,model.accessors,model);
 }
 
-void renderMesh(gel::mesh& mesh,gel::ShaderProgram& shader,gel::model& model){
-    SDL_Log(">>>RENDER MESH");
+void renderTechnique(gel::technique& technique,gel::model& model,std::map<std::string,void*> values){
+    //TODO: only call glUseProgram if program changed
+    glUseProgram(model.programs[technique.program].programReference);
+    for(std::pair<std::string,void*> value:values){
+        if(technique.uniforms.find(value.first) != technique.uniforms.end())
+            setShaderValue(value.second,technique.parameters[technique.uniforms[value.first]],false);
+        else setShaderValue(value.second,technique.parameters[technique.attributes[value.first]],true);
+    }
+    //TODO: finish
+}
+
+void renderMesh(gel::mesh& mesh,glm::mat4 transform,gel::model& model){
+    //SDL_Log(">>>RENDER MESH");
     for(gel::primitive primitive:mesh.primitives){
-        shader.setAttribute("a_color",
-            std::vector<GLfloat>{/*((float) rand()) / (float) RAND_MAX,((float) rand()) / (float) RAND_MAX,((float) rand()) / (float) RAND_MAX*/1.0f,1.0f,1.0f,1.0f});
+        renderTechnique(model.techniques[model.materials[primitive.material].technique],model,
+            std::map<std::string,void*>{{"u_projView",glm::value_ptr(transform)}});
         glBindVertexArray(primitive.bufferReference);
         if(primitive.indices != -1){
-            SDL_Log(">>>GL_DRAW_ELEMENTS [INDICES: %i,COMPONENT TYPE: %i]",
-                model.accessors[primitive.indices].count,getComponentType(model.accessors[primitive.indices].componentType));
+            //SDL_Log(">>>GL_DRAW_ELEMENTS [INDICES: %i,COMPONENT TYPE: %i]",
+            //    model.accessors[primitive.indices].count,getComponentType(model.accessors[primitive.indices].componentType));
             glDrawElements(GL_TRIANGLES,model.accessors[primitive.indices].count,getComponentType(model.accessors[primitive.indices].componentType),
                 (void *)(intptr_t)model.accessors[primitive.indices].byteOffset);      
         }
@@ -412,18 +721,18 @@ void renderMesh(gel::mesh& mesh,gel::ShaderProgram& shader,gel::model& model){
     }
 }
 
-glm::vec4 getSamplerValue(float curr,std::string path,gel::sampler& sampler,gel::model& model){
+glm::vec4 getSamplerValue(float curr,std::string path,gel::animation_sampler& sampler,gel::model& model){
     glm::vec4 sampleValue;
     if(sampler.interpolation != "LINEAR"){SDL_Log("!!!UNSUPPORTED SAMPLER INTERPOLATION: %s",sampler.interpolation.c_str());return sampleValue;}
     float prev = 0,next = 0; int prevIndex = 0,nextIndex = 0;
     curr = getLinearBoundingValues(curr,prev,next,prevIndex,nextIndex,model.accessors[sampler.input],model.bufferViews,model.buffers);
-    SDL_Log("CURRENT VAL: %f, BOUNDS: (%f,%f) or INDEX(%i,%i)",curr,prev,next,prevIndex,nextIndex);
+    //SDL_Log("CURRENT VAL: %f, BOUNDS: (%f,%f) or INDEX(%i,%i)",curr,prev,next,prevIndex,nextIndex);
     float interpolator = (curr - prev) / (next - prev);
     const float* output_ptr = (const float*)getBufferPointer(model.bufferViews[model.accessors[sampler.output].bufferView],model.accessors[sampler.output].byteOffset,model.buffers);
     std::vector<float> outputPrevious = getBufferValue(output_ptr,prevIndex,getTypeSize(model.accessors[sampler.output].type)),
         outputNext = getBufferValue(output_ptr,nextIndex,getTypeSize(model.accessors[sampler.output].type));
-    SDL_Log("OUTPUT PREV: %f,%f,%f,%f and OUTPUT NEXT: %f,%f,%f,%f",outputPrevious[0],outputPrevious[1],outputPrevious[2],outputPrevious[3],
-        outputNext[0],outputNext[1],outputNext[2],outputNext[3]);
+    //SDL_Log("OUTPUT PREV: %f,%f,%f,%f and OUTPUT NEXT: %f,%f,%f,%f",outputPrevious[0],outputPrevious[1],outputPrevious[2],outputPrevious[3],
+    //    outputNext[0],outputNext[1],outputNext[2],outputNext[3]);
     if(path == "rotation"){
         glm::quat slerped = glm::slerp(glm::quat(outputPrevious[3],outputPrevious[0],outputPrevious[1],outputPrevious[2]),
             glm::quat(outputNext[3],outputNext[0],outputNext[1],outputNext[2]),interpolator);
@@ -437,7 +746,7 @@ glm::vec4 getSamplerValue(float curr,std::string path,gel::sampler& sampler,gel:
 void renderChannel(float curr,gel::animation& animation,int i,gel::model& model){
     gel::channel channel = animation.channels[i];
     glm::vec4 sampleValue = getSamplerValue(curr,channel.target.path,animation.samplers[channel.sampler],model);
-    SDL_Log("SAMPLE VALUE: %f,%f,%f,%f",sampleValue[0],sampleValue[1],sampleValue[2],sampleValue[3]);
+   // SDL_Log("SAMPLE VALUE: %f,%f,%f,%f",sampleValue[0],sampleValue[1],sampleValue[2],sampleValue[3]);
     if(channel.target.path == "rotation") model.nodes[channel.target.node].rotation = sampleValue;
     else if(channel.target.path == "translation") model.nodes[channel.target.node].translation = sampleValue;
     else if(channel.target.path == "scale") model.nodes[channel.target.node].scale = sampleValue;
@@ -445,19 +754,18 @@ void renderChannel(float curr,gel::animation& animation,int i,gel::model& model)
 }
 
 float curr = 0.0f;
-void renderNode(gel::model& model,gel::ShaderProgram& shader,gel::node& node,gel::camera& camera,glm::mat4 parent){
+void renderNode(gel::model& model,gel::node& node,gel::camera& camera,glm::mat4 parent){
     parent = parent * node.matrix * glm::translate(node.translation) 
         * glm::mat4_cast(glm::quat(node.rotation[3],node.rotation[0],node.rotation[1],node.rotation[2])) 
         * glm::scale(node.scale);
-    shader.setUniform("u_projView",camera.transform * parent,false);
     if(node.mesh != -1)
-         renderMesh(model.meshes[node.mesh],shader,model);
+         renderMesh(model.meshes[node.mesh],camera.transform * parent,model);
     //Render all child nodes, if any.
     for(int i = 0;i < node.children.size();i++)
-        renderNode(model,shader,model.nodes[node.children[i]],camera,parent);
+        renderNode(model,model.nodes[node.children[i]],camera,parent);
 }
 
-void renderModel(gel::model& model,gel::ShaderProgram& shader,gel::camera& camera){
+void renderModel(gel::model& model,gel::camera& camera){
     glm::mat4 parent;
 
     //Render any animation channels.
@@ -466,11 +774,11 @@ void renderModel(gel::model& model,gel::ShaderProgram& shader,gel::camera& camer
     curr += 0.01f;
 
     //Set shader values.
-    shader.begin();
+    //shader.begin();
 
     //Render nodes.
     for(gel::scene scene:model.scenes)
     for(int i = 0;i < scene.nodes.size();i++)
-        renderNode(model,shader,model.nodes[scene.nodes[i]],camera,parent);
-    shader.end();
+        renderNode(model,model.nodes[scene.nodes[i]],camera,parent);
+    //shader.end();
 }

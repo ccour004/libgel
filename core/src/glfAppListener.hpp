@@ -22,28 +22,16 @@ SOFTWARE.*/
 
 #pragma once
 
-entityx::TimeDelta dt;
-#include <DefaultAppListener.hpp>
-
-#include "Camera.hpp"
-#include "Input.hpp"
-#include "helper/UIBuilder.hpp"
-#include "helper/ShapeBuilder.hpp"
-
-#include <rapidxml.hpp>
-
-#include "helper/Utility.hpp"
-
-std::vector<gel::Asset<gel::Mesh>> meshes;
-std::map<SDL_Keycode,bool> keyMap;
-
+#include <Application.hpp>
 #include "interfaces/GL_Interface.hpp"
 
-gel::camera camera;
 class MyRawInputProcessor: public gel::RawInputProcessor{
+    gel::camera* camera;
     bool drag = false;
-    float speed = 0.01f;
+    std::map<SDL_Keycode,bool> keyMap;
+    float speed = 0.01f,rotateX = 0.0f,rotateY = 0.0f;
 public:
+    MyRawInputProcessor(gel::camera* camera):camera(camera){}
     bool controllerAxisEvent(const SDL_ControllerAxisEvent& event){
         SDL_Log("[SDL_ControllerAxisEvent] axis: %i,value: %i",event.axis,event.value);
         return true;
@@ -69,14 +57,19 @@ public:
     bool touchFingerEvent(const SDL_TouchFingerEvent& event){
         switch(event.type){
             case SDL_FINGERDOWN: //SDL_Log("[SDL_FINGERDOWN]");
-                RenderSystem::drag = true;
+                drag = true;
                 break;
             case SDL_FINGERUP: //SDL_Log("[SDL_FINGERUP]");
-                RenderSystem::drag = false;
-                RenderSystem::rotateAmount = 0.0f;
+                drag = false;
                 break;
             case SDL_FINGERMOTION: //SDL_Log("[SDL_FINGERMOTION]: %f,%f",event.dx,event.dy);
-                if(RenderSystem::drag) RenderSystem::rotateAmount += event.dx;
+                if(drag){
+                    rotateX += event.dx * speed;
+                    rotateY += event.dy * speed;
+                    SDL_Log("XROT: %f,YROT: %f",rotateX,rotateY);
+                    rotateY = glm::clamp(rotateY,-1.5f,1.5f);
+                    camera->setRotate(rotateX,rotateY,0);
+                }
                 break;
         }
         return true;
@@ -91,8 +84,11 @@ public:
     bool mouseMotionEvent(const SDL_MouseMotionEvent& event){
         //SDL_Log("[SDL_MOUSEMOTIONEVENT]: %i,%i",event.xrel,event.yrel);
         if(drag){
-            camera.addRotate(glm::vec3(0,1,0),event.xrel * speed);
-            //camera.addRotate(glm::vec3(1,0,0),event.yrel * speed);
+            rotateX += event.xrel * speed;
+            rotateY += event.yrel * speed;
+            SDL_Log("XROT: %f,YROT: %f",rotateX,rotateY);
+            rotateY = glm::clamp(rotateY,-1.5f,1.5f);
+            camera->setRotate(rotateX,rotateY,0);
         }
         return true;
     }
@@ -111,75 +107,54 @@ public:
     
     bool mouseWheelEvent(const SDL_MouseWheelEvent& event){
         //SDL_Log("[SDL_MOUSEWHEELEVENT]: %i",event.y);
-        camera.setFov(glm::clamp(camera.getFov() - event.y,30.0f,120.0f/*90.0f*/));
+        camera->setFov(glm::clamp(camera->getFov() - event.y,30.0f,120.0f/*90.0f*/));
         return true;
     }
     
     bool multiGestureEvent(const SDL_MultiGestureEvent& event){
        // SDL_Log("[SDL_MULTIGESTUREEVENT]: %f",event.dDist);
-        RenderSystem::x -= event.dDist;
-        RenderSystem::eye = ((float)glm::clamp(RenderSystem::x,1,72)) * glm::normalize(RenderSystem::eye);
+        camera->setFov(glm::clamp(camera->getFov() - event.dDist,30.0f,120.0f/*90.0f*/));
         return true;
     }  
 };
 
-class glfAppListener: public gel::DefaultAppListener{
+class glfAppListener: public gel::ApplicationListener{
 public:
-    std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
-    gel::Asset<gel::ShaderProgram> altShader;
-    //glTF TEST
     gel::model model;
-    std::map<std::string,unsigned int> locations;
-    //glTF TEST
+    gel::camera camera;
  bool create(){
-    DefaultAppListener::create();
-
+     /**TODO: Set sane defaults for technique.states in glfw code instead of declaring these here.**/
     //Setup gl settings.
     glEnable(GL_DEPTH_TEST);
     glClearDepthf(1.0f);
     glDepthFunc(GL_LEQUAL);
     glLineWidth(2.0f);
-    glClearColor( 0.66f, 0.66f, 0.66f, 1.f );
+    glClearColor(0.66f,0.66f,0.66f,1.f);
+    /**TODO**/
             
-    //Setup input.
-    setRawInputProcessor(std::make_shared<MyRawInputProcessor>());
-
-    //Fonts
-    gel::Asset<gel::FontReference> sans_reg_16 = assets.load<gel::FontReference,gel::Font>("assets/font/OpenSans-Regular.ttf",16);
-
-    //Textures
-    gel::Asset<gel::TextureReference> sphereTexture = assets.load<gel::TextureReference,gel::Texture>("assets/test.jpg");
-        
-    //Setup shader program.
-    std::string prepend = "#version 300 es\n";
-    altShader = assets.load<gel::ShaderProgram,gel::ShaderSpec>("alt",std::vector<gel::ShaderSource>{
-        gel::ShaderSource("assets/alt.vert",GL_VERTEX_SHADER,prepend),
-        gel::ShaderSource("assets/alt.frag",GL_FRAGMENT_SHADER,prepend)
-    });
-
-    //glTF TEST
+    //Setup input and camera.
+    setRawInputProcessor(std::make_shared<MyRawInputProcessor>(&camera));
     camera = gel::camera(gel::perspective(640.0f/480.0f,45.0f,0.1f,100.0f));
     camera.setTranslate(glm::vec3(0,0,-10));
+
+    //Load model.
     fillWithJSON(model,"assets/BoxAnimated.gltf");
-    locations["POSITION"] = 0;
-    loadModel(model,"assets/",locations);
-    //glTF TEST
+    loadModel(model,"assets/");
     return true;
 }
 
 void resize(int width, int height){
-    RenderSystem::cam.setAspect((float)width,(float)height);
+    camera.setAspectRatio(width,height);
 }
 
 void render(){
-    DefaultAppListener::render();
-    //glTF TEST
-    glViewport(0,0,640,480);
+    /**TODO: glClear() should be abstracted behind a rendering interface**/
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    renderModel(model,*altShader.component<gel::ShaderProgram>(),camera);
-    //glTF TEST
+    /**TODO**/
+    renderModel(model,camera);
 }
 
+ void dispose(){}
  void pause(){}
  void resume(){}
 };

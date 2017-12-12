@@ -25,6 +25,7 @@ SOFTWARE.*/
 
 #include <entityx/entityx.h>
 #include <algorithm>
+#include <chrono>
 #include <btBulletDynamicsCommon.h>
 #include <btBulletCollisionCommon.h>
 #include <LinearMath/btDefaultMotionState.h>
