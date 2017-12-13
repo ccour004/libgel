@@ -125,6 +125,8 @@ public:
  bool create(){
      /**TODO: Set sane defaults for technique.states in glfw code instead of declaring these here.**/
     //Setup gl settings.
+    glEnable(GL_BLEND); 
+    glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA); 
     glEnable(GL_DEPTH_TEST);
     glClearDepthf(1.0f);
     glDepthFunc(GL_LEQUAL);
@@ -138,7 +140,7 @@ public:
     camera.setTranslate(glm::vec3(0,0,-10));
 
     //Load model.
-    fillWithJSON(model,"assets/BoxAnimated.gltf");
+    fillWithJSON(model,/*"assets/scene.gltf"*/"assets/BoxTextured.gltf");
     loadModel(model,"assets/");
     return true;
 }

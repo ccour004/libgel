@@ -75,7 +75,7 @@ namespace gel{
         primitive(std::map<std::string,int> attributes,int indices = -1):attributes(attributes),indices(indices){}
         std::map<std::string,int> attributes;
         int indices;
-        int material = 0,mode = 4;
+        int material = -1,mode = 4;
         //Extra:
         unsigned int bufferReference;
     };
@@ -158,16 +158,23 @@ namespace gel{
         std::vector<int> nodes;
     };
     struct textureInfo{
-        int index,texCoord;
+        int index = -1,texCoord;
     };
     struct pbrMetallicRoughness{
         pbrMetallicRoughness(){}
         std::vector<float> baseColorFactor;
         gel::textureInfo baseColorTexture,metallicRoughnessTexture;
-        float metallicFactor,roughnessFactor;
+        float metallicFactor = -1.0f,roughnessFactor;
+    };
+    struct pbrSpecularGlossiness{
+        pbrSpecularGlossiness(){}
+        std::vector<float> diffuseFactor,specularFactor;
+        gel::textureInfo diffuseTexture,specularGlossinessTexture;
+        int glossinessFactor = -1;
     };
     struct material{
         material(){}
+        material(int technique):technique(technique){}
         gel::pbrMetallicRoughness pbrMetallicRoughness;
         /*gel::normalTextureInfo normalTexture;
         gel::occlusionTextureInfo occlusionTexture;
@@ -176,6 +183,7 @@ namespace gel{
         std::string alphaMode;
         float alphaCutoff;
         bool doubleSided;*/
+        gel::pbrSpecularGlossiness pbrSpecularGlossiness;
         int technique;
     };
     struct shader{
@@ -216,11 +224,18 @@ namespace gel{
     };
 
     struct texture{
-        //TODO: finish
+        int sampler,source;
+        //Extra:
+        unsigned int textureReference;
     };
 
     struct sampler{
-        //TODO: finish
+        int magFilter,minFilter,wrapS,wrapT;
+    };
+
+    struct image{
+        std::string uri,mimeType;
+        int bufferView;
     };
 
     struct model{
@@ -235,10 +250,28 @@ namespace gel{
         std::vector<gel::material> materials;
         std::vector<gel::shader> shaders;
         std::vector<gel::texture> textures;
+        std::vector<gel::image> images;
         std::vector<gel::sampler> samplers;
         std::vector<gel::program> programs;
         std::vector<gel::technique> techniques;
     };
+    
+    void from_json(const nlohmann::json& j, gel::texture& texture){
+        if(j.find("sampler") != j.end()) texture.sampler = j.at("sampler").get<int>();
+        if(j.find("source") != j.end()) texture.source = j.at("source").get<int>();
+    }
+
+    void from_json(const nlohmann::json& j, gel::image& image){
+        if(j.find("uri") != j.end()) image.uri = j.at("uri").get<std::string>();
+        //TODO: finish this
+    }
+
+    void from_json(const nlohmann::json& j, gel::sampler& sampler){
+        if(j.find("minFilter") != j.end()) sampler.minFilter = j.at("minFilter").get<int>();
+        if(j.find("magFilter") != j.end()) sampler.magFilter = j.at("magFilter").get<int>();
+        if(j.find("wrapS") != j.end()) sampler.wrapS = j.at("wrapS").get<int>();
+        if(j.find("wrapT") != j.end()) sampler.wrapT = j.at("wrapT").get<int>();
+    }
 
     void from_json(const nlohmann::json& j, gel::technique_parameters& technique_parameters){
         if(j.find("type") != j.end()) technique_parameters.type = j.at("type").get<int>();
@@ -279,10 +312,21 @@ namespace gel{
         if(j.find("baseColorTexture") != j.end()) material.baseColorTexture = j.at("baseColorTexture").get<gel::textureInfo>();
         if(j.find("metallicRoughnessTexture") != j.end()) material.metallicRoughnessTexture = j.at("metallicRoughnessTexture").get<gel::textureInfo>();
         //TODO: fill out the rest
-    }   
+    } 
+    
+    void from_json(const nlohmann::json& j, gel::pbrSpecularGlossiness& material){
+        if(j.find("diffuseTexture") != j.end()) material.diffuseTexture = j.at("diffuseTexture").get<gel::textureInfo>();
+        if(j.find("specularGlossinessTexture") != j.end()) material.specularGlossinessTexture = j.at("specularGlossinessTexture").get<gel::textureInfo>();
+        if(j.find("specularFactor") != j.end()) material.specularFactor = j.at("specularFactor").get<std::vector<float>>();
+        if(j.find("diffuseFactor") != j.end()) material.diffuseFactor = j.at("diffuseFactor").get<std::vector<float>>();
+        if(j.find("glossinessFactor") != j.end()) material.glossinessFactor = j.at("glossinessFactor").get<float>();
+    }
 
     void from_json(const nlohmann::json& j, gel::material& material){
         if(j.find("pbrMetallicRoughness") != j.end()) material.pbrMetallicRoughness = j.at("pbrMetallicRoughness").get<gel::pbrMetallicRoughness>();
+        if(j.find("extensions") != j.end() && j.at("extensions").find("KHR_materials_pbrSpecularGlossiness") != j.at("extensions").end()){
+            material.pbrSpecularGlossiness = j.at("extensions").at("KHR_materials_pbrSpecularGlossiness").get<gel::pbrSpecularGlossiness>();
+        }
         if(j.find("technique") != j.end()) material.technique = j.at("technique").get<int>(); else material.technique = 0;
         //TODO: fill out the rest
     }    
@@ -379,22 +423,33 @@ namespace gel{
         model.bufferViews = j.at("bufferViews").get<std::vector<gel::bufferView>>();
         model.accessors = j.at("accessors").get<std::vector<gel::accessor>>();
         model.meshes = j.at("meshes").get<std::vector<gel::mesh>>();
-        model.materials = j.at("materials").get<std::vector<gel::material>>();
+        if(j.find("materials") != j.end()) model.materials = j.at("materials").get<std::vector<gel::material>>();
         if(j.find("animations") != j.end()) model.animations = j.at("animations").get<std::vector<gel::animation>>();
         if(j.find("shaders") != j.end()) model.shaders = j.at("shaders").get<std::vector<gel::shader>>();
         model.nodes = j.at("nodes").get<std::vector<gel::node>>();
+        if(j.find("images") != j.end()) model.images = j.at("images").get<std::vector<gel::image>>();
+        if(j.find("samplers") != j.end()) model.samplers = j.at("samplers").get<std::vector<gel::sampler>>();
+        if(j.find("textures") != j.end()) model.textures = j.at("textures").get<std::vector<gel::texture>>();
 
         //Default shader/program/technique values in case they're missing from the model (they're extensions["KHR_technique_webgl"] atm, anyhow):
+        model.materials.push_back(gel::material(0));
+        for(gel::mesh mesh:model.meshes)
+        for(gel::primitive primitive:mesh.primitives){
+            if(primitive.material == -1)
+                primitive.material = 0;
+        }
         model.shaders.push_back(gel::shader("default.vert",VERTEX_SHADER));
         model.shaders.push_back(gel::shader("default.frag",FRAGMENT_SHADER));
         model.programs.push_back(gel::program(model.shaders.size()-2,model.shaders.size()-1,std::vector<std::string>{
-            "a_position"
+            "a_position","a_texcoord0"
         }));
         std::map<std::string,std::string> attributes,uniforms;
         std::map<std::string,gel::technique_parameters> parameters;
         attributes["a_position"] = "position";
+        attributes["a_texcoord0"] = "texcoord0";
         parameters["projectionMatrix"] = gel::technique_parameters("PROJECTION",35676);
         parameters["position"] = gel::technique_parameters("POSITION",35665);
+        parameters["texcoord0"] = gel::technique_parameters("TEXCOORD_0",35665);
         uniforms["u_projView"] = "projectionMatrix";
         //TODO: fill out for default technique
         model.techniques.push_back(gel::technique(attributes,uniforms,parameters,0));
@@ -482,6 +537,7 @@ void loadPrimitive(gel::primitive& primitive,const std::vector<gel::bufferView>&
 
     //Load all vertex attributes.
     for(std::pair<std::string,int> attribute:primitive.attributes){
+        SDL_Log("ACCESSOR: %i",attribute.second);
         gel::accessor accessor = accessors[attribute.second];
         gel::bufferView view = bufferViews[accessor.bufferView];
         glBindBuffer(GL_ARRAY_BUFFER,view.bufferReference);
@@ -490,6 +546,7 @@ void loadPrimitive(gel::primitive& primitive,const std::vector<gel::bufferView>&
         std::map<std::string,gel::technique_parameters> parameters = model.techniques[model.materials[primitive.material].technique].parameters;
         for(std::pair<std::string,gel::technique_parameters> parameter:parameters){
             if(parameter.second.semantic == attribute.first){
+                SDL_Log("SEMANTIC: %s,ATTRIBUTE: %s",parameter.second.semantic.c_str(),attribute.first.c_str());
                 loadAccessor(accessor,view,parameter.second.parameterReference);
                 break;
             }
@@ -661,29 +718,72 @@ void setShaderValue(void* value,gel::technique_parameters parameter,bool isAttri
     }
 }
 
-void loadTexture(gel::texture& texture){
-    //TODO: finish
+void loadTexture(gel::texture& texture,std::string path,gel::model& model){
+    glGenTextures(1, &texture.textureReference);
+    glBindTexture(GL_TEXTURE_2D,texture.textureReference);
+
+    //Load the image data.
+    gel::image image = model.images[texture.source];
+    SDL_Surface* imageData = IMG_Load((path+image.uri).c_str()); 
+    int format = imageData->format->BytesPerPixel == 1 || imageData->format->BytesPerPixel == 3 ? GL_RGB : GL_RGBA;
+    //SDL_Log("IMAGE width: %i,height: %i,bitsPerPixel: %i,bytesPerPixel: %i,format: %i",imageData->w, imageData->h,imageData->format->BitsPerPixel,
+    //    imageData->format->BytesPerPixel,imageData->format->format);
+    if(imageData->format->palette){
+            //SDL_Log("PALETTE: %i",imageData->format->palette->ncolors);
+            //for(int i = 0;i < imageData->format->palette->ncolors;i++)
+            //    SDL_Log("PALETTE COLOR %i: (%i,%i,%i)",i,imageData->format->palette->colors[i].r,imageData->format->palette->colors[i].g,imageData->format->palette->colors[i].b);
+            unsigned char* pixels = new unsigned char[imageData->w * imageData->h * 3];
+            int pixelCounter = 0;
+            for(int i = 0;i < imageData->w * imageData->h;i++){
+               // SDL_Log("COLOR index %i is: %i",i,((unsigned char*)imageData->pixels)[i]);
+                pixels[pixelCounter++] = imageData->format->palette->colors[((unsigned char*)imageData->pixels)[i]].r;
+                pixels[pixelCounter++] = imageData->format->palette->colors[((unsigned char*)imageData->pixels)[i]].g;
+                pixels[pixelCounter++] = imageData->format->palette->colors[((unsigned char*)imageData->pixels)[i]].b;
+            }
+            glTexImage2D(GL_TEXTURE_2D, 0, format, imageData->w, imageData->h, 0,format, GL_UNSIGNED_BYTE,pixels);
+    }else glTexImage2D(GL_TEXTURE_2D, 0, format,imageData->w,imageData->h, 0,format, GL_UNSIGNED_BYTE,imageData->pixels);
+    
+    gel::sampler sampler = model.samplers[texture.sampler];
+    GLenum magFilter = GL_NEAREST,minFilter = GL_NEAREST,wrapS = GL_REPEAT,wrapT = GL_REPEAT;
+    /*switch(sampler.magFilter){
+        case 9729: magFilter = GL_LINEAR;break;
+    }
+    switch(sampler.minFilter){
+        case 9729: minFilter = GL_LINEAR;break;
+        case 9984: minFilter = GL_NEAREST_MIPMAP_NEAREST; break;
+        case 9985: minFilter = GL_LINEAR_MIPMAP_NEAREST; break;
+        case 9986: minFilter = GL_NEAREST_MIPMAP_LINEAR; break;
+        case 9987: minFilter = GL_LINEAR_MIPMAP_LINEAR; break;
+    }
+    switch(sampler.wrapS){
+        case 33071: wrapS = GL_CLAMP_TO_EDGE; break;
+        case 33648: wrapS = GL_MIRRORED_REPEAT; break;
+    }
+    switch(sampler.wrapT){
+        case 33071: wrapT = GL_CLAMP_TO_EDGE; break;
+        case 33648: wrapT = GL_MIRRORED_REPEAT; break;
+    }*/
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, wrapS);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, wrapT);          
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, minFilter);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, magFilter);
+    SDL_FreeSurface(imageData);
 }
 
-void loadSampler(gel::sampler& sampler){
+void loadImage(gel::image& image){
     //TODO: finish
-}
-
-void loadMaterial(gel::material& material){
-    //TODO: finish
+    //load into data buffer if bufferView is defined, or if the uri is a data-uri
 }
 
 void loadModel(gel::model& model,std::string path){
+    SDL_Log("+++LOADING IMAGES...");
+    for(int i = 0;i < model.images.size();i++) loadImage(model.images[i]);
+    SDL_Log("+++LOADING TEXTURES...");
+    for(int i = 0;i < model.textures.size();i++) loadTexture(model.textures[i],path,model);
     SDL_Log("+++LOADING BUFFERS...");
     for(int i = 0;i < model.buffers.size();i++) loadBuffer(path,model.buffers[i]);
     SDL_Log("+++LOADING BUFFER VIEWS...");
     for(int i = 0;i < model.bufferViews.size();i++) loadBufferView(model.bufferViews[i],model.buffers);
-    SDL_Log("+++LOADING TEXTURES...");
-    for(int i = 0;i < model.textures.size();i++) loadTexture(model.textures[i]);
-    SDL_Log("+++LOADING SAMPLERS...");
-    for(int i = 0;i < model.samplers.size();i++) loadSampler(model.samplers[i]);
-    SDL_Log("+++LOADING MATERIALS...");
-    for(int i = 0;i < model.materials.size();i++) loadMaterial(model.materials[i]);
     SDL_Log("+++LOADING SHADERS...");
     for(int i = 0;i < model.shaders.size();i++) loadShader(path,model.shaders[i]);
     SDL_Log("+++LOADING PROGRAMS...");
@@ -705,11 +805,21 @@ void renderTechnique(gel::technique& technique,gel::model& model,std::map<std::s
     //TODO: finish
 }
 
+void renderTexture(gel::material material,gel::model& model){
+    if(material.pbrMetallicRoughness.baseColorTexture.index != -1)
+        glBindTexture(GL_TEXTURE_2D,model.textures[material.pbrMetallicRoughness.baseColorTexture.index].textureReference);
+    else if(material.pbrSpecularGlossiness.diffuseTexture.index != -1){
+        glBindTexture(GL_TEXTURE_2D,model.textures[material.pbrSpecularGlossiness.diffuseTexture.index].textureReference);
+    }
+    //TODO: fill this out a lot more with various textures, factors, etc. for both metallicRoughness and specularGlossiness
+}
+
 void renderMesh(gel::mesh& mesh,glm::mat4 transform,gel::model& model){
     //SDL_Log(">>>RENDER MESH");
     for(gel::primitive primitive:mesh.primitives){
         renderTechnique(model.techniques[model.materials[primitive.material].technique],model,
             std::map<std::string,void*>{{"u_projView",glm::value_ptr(transform)}});
+        renderTexture(model.materials[primitive.material],model);
         glBindVertexArray(primitive.bufferReference);
         if(primitive.indices != -1){
             //SDL_Log(">>>GL_DRAW_ELEMENTS [INDICES: %i,COMPONENT TYPE: %i]",
