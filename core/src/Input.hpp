@@ -28,6 +28,7 @@ namespace gel
 {
     class RawInputProcessor {
     public:
+        bool hasQuit = false;
         //SDL_AudioDeviceEvent(SDL_AUDIODEVICEADDED,SDL_AUDIODEVICEREMOVED)
         virtual bool controllerAxisEvent(const SDL_ControllerAxisEvent& event) = 0;
         virtual bool controllerButtonEvent(const SDL_ControllerButtonEvent& event) = 0;
@@ -48,5 +49,6 @@ namespace gel
         //SDL_TextEditingEvent(SDL_TEXTEDITING)
         //SDL_TextInputEvent(SDL_TEXTINPUT)
         //SDL_UserEvent(SDL_USEREVENT)
+        void quit(){hasQuit = true;}
     };
 }

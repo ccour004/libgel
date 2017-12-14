@@ -84,6 +84,8 @@ namespace gel{
         mesh(std::vector<gel::primitive> primitives):primitives(primitives){}
         std::vector<gel::primitive> primitives;
         //TODO: finish
+        //Extra:
+        bool isVisible = true;
     };
     struct node{
         node(){}
@@ -162,13 +164,13 @@ namespace gel{
     };
     struct pbrMetallicRoughness{
         pbrMetallicRoughness(){}
-        std::vector<float> baseColorFactor;
+        std::vector<float> baseColorFactor = std::vector<float>{0.0f,0.0f,0.0f,1.0f};
         gel::textureInfo baseColorTexture,metallicRoughnessTexture;
         float metallicFactor = -1.0f,roughnessFactor;
     };
     struct pbrSpecularGlossiness{
         pbrSpecularGlossiness(){}
-        std::vector<float> diffuseFactor,specularFactor;
+        std::vector<float> diffuseFactor = std::vector<float>{0.0f,0.0f,0.0f,1.0f},specularFactor;
         gel::textureInfo diffuseTexture,specularGlossinessTexture;
         int glossinessFactor = -1;
     };
@@ -204,6 +206,7 @@ namespace gel{
     };
     struct technique_parameters{
         technique_parameters(){}
+        technique_parameters(int type):type(type){}
         technique_parameters(std::string semantic,int type):semantic(semantic),type(type){}
         int count,node,type;
         std::string semantic;
@@ -240,6 +243,23 @@ namespace gel{
 
     struct model{
         model(){}
+        void clear(){
+            scenes.clear();
+            nodes.clear();
+            meshes.clear();
+            animations.clear();
+            buffers.clear();
+            bufferViews.clear();
+            accessors.clear();
+            materials.clear();
+            shaders.clear();
+            textures.clear();
+            images.clear();
+            samplers.clear();
+            programs.clear();
+            techniques.clear();   
+            glBindTexture(GL_TEXTURE_2D,0);     
+        }
         std::vector<gel::scene> scenes;
         std::vector<gel::node> nodes;
         std::vector<gel::mesh> meshes;
@@ -450,7 +470,9 @@ namespace gel{
         parameters["projectionMatrix"] = gel::technique_parameters("PROJECTION",35676);
         parameters["position"] = gel::technique_parameters("POSITION",35665);
         parameters["texcoord0"] = gel::technique_parameters("TEXCOORD_0",35665);
+        parameters["diffuse"] = gel::technique_parameters(35666);
         uniforms["u_projView"] = "projectionMatrix";
+        uniforms["u_diffuse"] = "diffuse";
         //TODO: fill out for default technique
         model.techniques.push_back(gel::technique(attributes,uniforms,parameters,0));
     }
@@ -816,9 +838,16 @@ void renderTexture(gel::material material,gel::model& model){
 
 void renderMesh(gel::mesh& mesh,glm::mat4 transform,gel::model& model){
     //SDL_Log(">>>RENDER MESH");
+    if(mesh.isVisible)
     for(gel::primitive primitive:mesh.primitives){
         renderTechnique(model.techniques[model.materials[primitive.material].technique],model,
-            std::map<std::string,void*>{{"u_projView",glm::value_ptr(transform)}});
+            std::map<std::string,void*>{
+                {"u_projView",glm::value_ptr(transform)},
+                {"u_diffuse",
+                model.materials[primitive.material].pbrMetallicRoughness.metallicFactor !=-1.0f?
+                model.materials[primitive.material].pbrMetallicRoughness.baseColorFactor.data():
+                model.materials[primitive.material].pbrSpecularGlossiness.diffuseFactor.data()}
+            });
         renderTexture(model.materials[primitive.material],model);
         glBindVertexArray(primitive.bufferReference);
         if(primitive.indices != -1){

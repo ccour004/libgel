@@ -23,15 +23,66 @@ SOFTWARE.*/
 #pragma once
 
 #include <Application.hpp>
+#include <deque>
 #include "interfaces/GL_Interface.hpp"
+
+enum CMDVal {quit,meshcmd,modelcmd,cameracmd};
+std::map<std::string,CMDVal> commandMap = std::map<std::string,CMDVal>{
+    {"quit",quit},{"mesh",meshcmd},{"model",modelcmd},{"camera",cameracmd}
+};
+
+std::string myCommand(std::string cmd,gel::model& model,gel::camera& camera){
+    std::stringstream ss(cmd);
+    while(!ss.eof()){
+        std::string output;
+        ss >> output;
+        SDL_Log("OUTPUT: %s",output.c_str());
+        switch(commandMap[output]){
+            case quit: return "ACK: quit";
+            case cameracmd:
+                ss>>output;
+                float index1,index2,index3;
+                if(output == "setTranslate"){
+                    ss>>index1>>index2>>index3;
+                    camera.setTranslate(glm::vec3(index1,index2,index3));
+                }
+                return ">set camera";
+            case modelcmd:
+                ss>>output;
+                if(output == "load"){
+                    model.clear();
+                    ss>>output;
+                    fillWithJSON(model,"assets/"+output+".gltf");
+                    loadModel(model,"assets/");
+                }
+                return ">load model";
+            case meshcmd:
+                ss>>output;
+                int index;
+                if(output == "setvisible"){
+                    ss>>index;
+                    model.meshes[index].isVisible = true;
+                }else if(output == "setinvisible"){
+                    ss>>index;
+                    model.meshes[index].isVisible = false;
+                }
+            return ">set mesh visibility";
+        }
+    }
+    return "<UNKNOWN COMMAND>";
+}
 
 class MyRawInputProcessor: public gel::RawInputProcessor{
     gel::camera* camera;
-    bool drag = false;
+    gel::model* model;
+    std::function<std::string(std::string,gel::model&,gel::camera&)> cmdptr;
+    bool drag = false,shift = false;
     std::map<SDL_Keycode,bool> keyMap;
+    std::vector<SDL_Keycode> keyBuffer;
+    std::deque<std::string> commandBuffer;
     float speed = 0.01f,rotateX = 0.0f,rotateY = 0.0f;
 public:
-    MyRawInputProcessor(gel::camera* camera):camera(camera){}
+    MyRawInputProcessor(gel::camera* camera,gel::model* model,std::function<std::string(std::string,gel::model&,gel::camera&)> cmdptr):camera(camera),model(model),cmdptr(cmdptr){}
     bool controllerAxisEvent(const SDL_ControllerAxisEvent& event){
         SDL_Log("[SDL_ControllerAxisEvent] axis: %i,value: %i",event.axis,event.value);
         return true;
@@ -76,7 +127,30 @@ public:
     }
     bool keyboardEvent(const SDL_KeyboardEvent& event){
         //SDL_Log("[SDL_KEYBOARDEVENT]");
-        if(event.type == SDL_KEYDOWN) keyMap[event.keysym.sym] = true;
+        if(event.type == SDL_KEYDOWN) {
+            keyMap[event.keysym.sym] = true;
+            std::string output = "";
+            if(event.keysym.sym == 8 && keyBuffer.size() > 0) keyBuffer.pop_back();
+            else if (event.keysym.sym != 8 && event.keysym.sym != SDLK_RSHIFT && event.keysym.sym != SDLK_LSHIFT) 
+                keyBuffer.push_back(keyMap[SDLK_RSHIFT] || keyMap[SDLK_LSHIFT]?toupper(event.keysym.sym):event.keysym.sym);
+            for(SDL_Keycode keycode:keyBuffer) output += keycode;
+            #ifdef _WIN32 
+            system("cls"); 
+            #else 
+            system("clear"); 
+            #endif
+            if(event.keysym.sym == 13){
+                keyBuffer.clear();
+                if(commandBuffer.size() > 256) commandBuffer.pop_front();
+                commandBuffer.push_back(output);
+                std::string latest = cmdptr(output,*model,*camera);
+                commandBuffer.push_back(latest);
+                if(latest == "ACK: quit")quit();
+                output = "";
+            }
+            for(std::string cmd:commandBuffer)SDL_Log("%s",cmd.c_str());
+            SDL_Log("CMD: <%s>",output.c_str());
+        }
         else keyMap[event.keysym.sym] = false;
         return true;
     }
@@ -135,13 +209,9 @@ public:
     /**TODO**/
             
     //Setup input and camera.
-    setRawInputProcessor(std::make_shared<MyRawInputProcessor>(&camera));
+    setRawInputProcessor(std::make_shared<MyRawInputProcessor>(&camera,&model,myCommand));
     camera = gel::camera(gel::perspective(640.0f/480.0f,45.0f,0.1f,100.0f));
     camera.setTranslate(glm::vec3(0,0,-10));
-
-    //Load model.
-    fillWithJSON(model,/*"assets/scene.gltf"*/"assets/BoxTextured.gltf");
-    loadModel(model,"assets/");
     return true;
 }
 

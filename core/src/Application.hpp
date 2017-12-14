@@ -172,7 +172,7 @@ namespace gel
                 while(!quit){
                     while(SDL_PollEvent(&e) != 0){
                         //System events first.
-                        if(e.type == SDL_QUIT){quit = true;SDL_Log("!!!SDL_QUIT!!!"); continue;}
+                        if(listener->getRawInputProcessor()->hasQuit || e.type == SDL_QUIT){quit = true;SDL_Log("!!!SDL_QUIT!!!"); continue;}
                         switch(e.type){
                             case SDL_APP_TERMINATING:SDL_Log("!!!SDL_APP_TERMINATING!!!");
                             case SDL_APP_LOWMEMORY:SDL_Log("!!!SDL_APP_LOWMEMORY!!!");
@@ -224,9 +224,9 @@ namespace gel
                                 listener->getRawInputProcessor()->mouseButtonEvent((const SDL_MouseButtonEvent&)e); break;
                             case SDL_MOUSEWHEEL: listener->getRawInputProcessor()->mouseWheelEvent((const SDL_MouseWheelEvent&)e); break;
                             case SDL_MULTIGESTURE: listener->getRawInputProcessor()->multiGestureEvent((const SDL_MultiGestureEvent&)e); break;
-                            case SDL_TEXTINPUT:
+                            /*case SDL_TEXTINPUT:
                                 if(e.text.text[0] == 'q') quit = true;
-                                break;
+                                break;*/
                         }
                     }
         
