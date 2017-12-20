@@ -29,7 +29,9 @@ int main(int argc, char* argv[])
 {    
     std::shared_ptr<gel::DesktopConfiguration> desktop = std::make_shared<gel::DesktopConfiguration>();
     std::shared_ptr<gel::MobileConfiguration> mobile = std::make_shared<gel::MobileConfiguration>();
-    desktop->fullscreen = true;
+    //desktop->fullscreen = true;
+    desktop->width = 1280;
+    desktop->height = 960;
     desktop->setBetterAntiAlias();
     mobile->setBetterAntiAlias();
     

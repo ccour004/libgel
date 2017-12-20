@@ -196,6 +196,7 @@ class glfAppListener: public gel::ApplicationListener{
 public:
     gel::model model;
     gel::camera camera;
+    float curr = 0.0f;
  bool create(){
      /**TODO: Set sane defaults for technique.states in glfw code instead of declaring these here.**/
     //Setup gl settings.
@@ -210,8 +211,10 @@ public:
             
     //Setup input and camera.
     setRawInputProcessor(std::make_shared<MyRawInputProcessor>(&camera,&model,myCommand));
-    camera = gel::camera(gel::perspective(640.0f/480.0f,45.0f,0.1f,100.0f));
-    camera.setTranslate(glm::vec3(0,0,-10));
+    camera = gel::camera(gel::perspective(640.0f/480.0f,45.0f,0.1f,1000.0f));
+    camera.setTranslate(glm::vec3(0,0,-500/*-10*/));
+    fillWithJSON(model,"assets/scene.gltf");
+    loadModel(model,"assets/");
     return true;
 }
 
@@ -223,7 +226,8 @@ void render(){
     /**TODO: glClear() should be abstracted behind a rendering interface**/
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     /**TODO**/
-    renderModel(model,camera);
+    curr += 0.01f;
+    renderModel(model,camera,curr);
 }
 
  void dispose(){}

@@ -43,7 +43,9 @@ namespace gel{
     #define FRAGMENT_SHADER 35632
     #define VERTEX_SHADER 35633
     struct camera;
+    struct model;
     void renderCamera(camera& camera);
+    void updateModel(model& model);
     //TODO: fill out all of these structs w/ params based on glTF spec
     struct buffer{
         buffer(){}
@@ -56,7 +58,7 @@ namespace gel{
     };
     struct bufferView{
         bufferView():byteStride(0){}
-        bufferView(int buffer,int byteOffset,int byteLength,int target,int byteStride = 0):buffer(buffer),byteOffset(byteOffset),
+        bufferView(int buffer,int byteOffset,int byteLength,int target,int byteStride):buffer(buffer),byteOffset(byteOffset),
             byteLength(byteLength),byteStride(byteStride){}
         int buffer,target,byteLength,byteOffset = 0,byteStride = 0;
 
@@ -109,7 +111,7 @@ namespace gel{
         camera():type("perspective"){renderCamera(*this);}
         camera(gel::orthographic ortho):type("orthographic"),orthographic(ortho){renderCamera(*this);}
         camera(gel::perspective persp):type("perspective"),perspective(persp){renderCamera(*this);}
-        void setAspectRatio(float width,float height){perspective.aspectRatio = width/height;glViewport(0,0,width,height);renderCamera(*this);}
+        void setAspectRatio(float width,float height){perspective.aspectRatio = width/height;glViewport(0,0,1280,960);renderCamera(*this);}
         void setFov(float yfov){perspective.yfov = glm::radians(yfov);renderCamera(*this);}
         float getFov(){return glm::degrees(perspective.yfov);}
         void setXMag(float xmag){orthographic.xmag = xmag;renderCamera(*this);}
@@ -243,6 +245,9 @@ namespace gel{
 
     struct model{
         model(){}
+        void setTranslate(glm::vec3 translate){this->translate = translate;updateModel(*this);}
+        void setRotate(float rotateX,float rotateY,float rotateZ){rotate = glm::quat(glm::vec3(rotateY,rotateX,rotateZ));updateModel(*this);}
+        void setScale(float scaleX,float scaleY,float scaleZ){this->scale = scale;updateModel(*this);}
         void clear(){
             scenes.clear();
             nodes.clear();
@@ -274,7 +279,15 @@ namespace gel{
         std::vector<gel::sampler> samplers;
         std::vector<gel::program> programs;
         std::vector<gel::technique> techniques;
+        //Extra:
+        glm::vec3 translate,scale;
+        glm::quat rotate;
+        glm::mat4 transform;
     };
+
+    void updateModel(gel::model& model){
+        model.transform = glm::translate(model.translate)  * glm::mat4_cast(model.rotate) * glm::scale(model.scale);
+    }
     
     void from_json(const nlohmann::json& j, gel::texture& texture){
         if(j.find("sampler") != j.end()) texture.sampler = j.at("sampler").get<int>();
@@ -322,7 +335,7 @@ namespace gel{
 
     void from_json(const nlohmann::json& j, gel::textureInfo& textureInfo){
         if(j.find("index") != j.end()) textureInfo.index = j.at("index").get<int>();
-        if(j.find("texCoord") != j.end()) textureInfo.index = j.at("texCoord").get<int>();
+        if(j.find("texCoord") != j.end()) textureInfo.texCoord = j.at("texCoord").get<int>();
     }
 
     void from_json(const nlohmann::json& j, gel::pbrMetallicRoughness& material){
@@ -378,7 +391,6 @@ namespace gel{
         }
         if(j.find("translation") != j.end()){
             std::vector<float> translation = j.at("translation").get<std::vector<float>>();
-            //node.transform *= glm::translate(glm::vec3(translation[0],translation[1],translation[2]));
             node.translation = glm::vec3(translation[0],translation[1],translation[2]);
         }
         if(j.find("rotation") != j.end()){
@@ -393,8 +405,8 @@ namespace gel{
         }
         if(j.find("matrix") != j.end()){
             std::vector<float> matrix = j.at("matrix").get<std::vector<float>>();
-            node.matrix = glm::transpose(glm::mat4(matrix[0],matrix[1],matrix[2],matrix[3],matrix[4],matrix[5],matrix[6],matrix[7],
-                matrix[8],matrix[9],matrix[10],matrix[11],matrix[12],matrix[13],matrix[14],matrix[15]));
+            node.matrix = glm::mat4(matrix[0],matrix[1],matrix[2],matrix[3],matrix[4],matrix[5],matrix[6],matrix[7],
+                matrix[8],matrix[9],matrix[10],matrix[11],matrix[12],matrix[13],matrix[14],matrix[15]);
             }
         if(j.find("children") != j.end()){
             node.children = j.at("children").get<std::vector<int>>();
@@ -408,6 +420,7 @@ namespace gel{
     void from_json(const nlohmann::json& j, gel::bufferView& bufferView){
         bufferView.buffer = j.at("buffer").get<int>();
         if(j.find("byteOffset") != j.end()) bufferView.byteOffset = j.at("byteOffset").get<int>();
+        if(j.find("byteStride") != j.end()) bufferView.byteStride = j.at("byteStride").get<int>();
         bufferView.byteLength = j.at("byteLength").get<int>();
         if(j.find("target") != j.end()) bufferView.target = j.at("target").get<int>();
     }
@@ -544,6 +557,40 @@ int getTypeSize(std::string type){
     if(type == "MAT4") return 16;
 }
 
+void printAccessor(const gel::accessor& accessor,const gel::model& model){
+    gel::bufferView bufferView = model.bufferViews[accessor.bufferView];
+    gel::buffer buffer = model.buffers[bufferView.buffer];
+    GLenum componentType = getComponentType(accessor.componentType);
+    int typeSize = getTypeSize(accessor.type);
+    const unsigned char* dataptr = buffer.data.data()+bufferView.byteOffset+accessor.byteOffset;
+    std::string output = "[ACCESSOR VALUES]: {";
+    for(int i = 0;i < accessor.count;i++){
+        for(int j = 0;j < typeSize;j++){
+            switch(componentType){
+                case GL_FLOAT:
+                output += std::to_string(*(float*)(dataptr + j * sizeof(componentType))) + ",";
+                break;
+                case GL_UNSIGNED_INT:
+                output += std::to_string(*(unsigned int*)(dataptr + j * sizeof(componentType))) + ",";
+                break;
+                case GL_UNSIGNED_BYTE:
+                output += std::to_string(*(unsigned char*)(dataptr + j * sizeof(componentType))) + ",";
+                break;
+                case GL_SHORT:
+                output += std::to_string(*(short*)(dataptr + j * sizeof(componentType))) + ",";
+                break;
+                case GL_UNSIGNED_SHORT:
+                output += std::to_string(*(unsigned short*)(dataptr + j * sizeof(componentType))) + ",";
+                break;
+            }
+        }
+        if(bufferView.byteStride != 0)
+            dataptr += bufferView.byteStride;
+        else dataptr += typeSize * sizeof(componentType);
+    }
+    SDL_Log((output+"}").c_str());
+}
+
 void loadAccessor(const gel::accessor& accessor,const gel::bufferView& bufferView,unsigned int location){
     GLenum type = getComponentType(accessor.componentType);
     int size = getTypeSize(accessor.type);
@@ -570,6 +617,10 @@ void loadPrimitive(gel::primitive& primitive,const std::vector<gel::bufferView>&
             if(parameter.second.semantic == attribute.first){
                 SDL_Log("SEMANTIC: %s,ATTRIBUTE: %s",parameter.second.semantic.c_str(),attribute.first.c_str());
                 loadAccessor(accessor,view,parameter.second.parameterReference);
+                if(parameter.second.semantic == "POSITION"){
+                    SDL_Log("POSITION [%i]",attribute.second);
+                    printAccessor(accessor,model);
+                }
                 break;
             }
         }
@@ -578,6 +629,8 @@ void loadPrimitive(gel::primitive& primitive,const std::vector<gel::bufferView>&
     //Load index buffer if applicable.
     if(primitive.indices != -1){
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,bufferViews[accessors[primitive.indices].bufferView].bufferReference);
+        SDL_Log("INDICES [%i]",primitive.indices);
+        printAccessor(accessors[primitive.indices],model);
     }
 }
 
@@ -854,7 +907,7 @@ void renderMesh(gel::mesh& mesh,glm::mat4 transform,gel::model& model){
             //SDL_Log(">>>GL_DRAW_ELEMENTS [INDICES: %i,COMPONENT TYPE: %i]",
             //    model.accessors[primitive.indices].count,getComponentType(model.accessors[primitive.indices].componentType));
             glDrawElements(GL_TRIANGLES,model.accessors[primitive.indices].count,getComponentType(model.accessors[primitive.indices].componentType),
-                (void *)(intptr_t)model.accessors[primitive.indices].byteOffset);      
+                BUFFER_OFFSET(model.accessors[primitive.indices].byteOffset));      
         }
         else glDrawArrays(GL_TRIANGLES,0,model.accessors[primitive.attributes["POSITION"]].count);
     }
@@ -886,38 +939,33 @@ void renderChannel(float curr,gel::animation& animation,int i,gel::model& model)
     gel::channel channel = animation.channels[i];
     glm::vec4 sampleValue = getSamplerValue(curr,channel.target.path,animation.samplers[channel.sampler],model);
    // SDL_Log("SAMPLE VALUE: %f,%f,%f,%f",sampleValue[0],sampleValue[1],sampleValue[2],sampleValue[3]);
-    if(channel.target.path == "rotation") model.nodes[channel.target.node].rotation = sampleValue;
+    if(channel.target.path == "rotation") {model.nodes[channel.target.node].rotation = sampleValue;}
     else if(channel.target.path == "translation") model.nodes[channel.target.node].translation = sampleValue;
     else if(channel.target.path == "scale") model.nodes[channel.target.node].scale = sampleValue;
     //TODO: add 'weights' target
 }
 
-float curr = 0.0f;
 void renderNode(gel::model& model,gel::node& node,gel::camera& camera,glm::mat4 parent){
     parent = parent * node.matrix * glm::translate(node.translation) 
         * glm::mat4_cast(glm::quat(node.rotation[3],node.rotation[0],node.rotation[1],node.rotation[2])) 
         * glm::scale(node.scale);
-    if(node.mesh != -1)
-         renderMesh(model.meshes[node.mesh],camera.transform * parent,model);
+    if(node.mesh != -1){
+        renderMesh(model.meshes[node.mesh],camera.transform * parent,model);
+        // printAccessor(model.accessors[model.meshes[node.mesh].primitives[0].attributes["POSITION"]],model);
+    }
     //Render all child nodes, if any.
     for(int i = 0;i < node.children.size();i++)
         renderNode(model,model.nodes[node.children[i]],camera,parent);
 }
 
-void renderModel(gel::model& model,gel::camera& camera){
-    glm::mat4 parent;
-
+void renderModel(gel::model& model,gel::camera& camera,float current_time){
     //Render any animation channels.
     for(int i = 0;i < model.animations.size();i++)
-    renderChannel(curr,model.animations[i],0,model);
-    curr += 0.01f;
-
-    //Set shader values.
-    //shader.begin();
+    for(int j = 0;j < model.animations[i].channels.size();j++)
+    renderChannel(current_time,model.animations[i],j,model);
 
     //Render nodes.
     for(gel::scene scene:model.scenes)
     for(int i = 0;i < scene.nodes.size();i++)
-        renderNode(model,model.nodes[scene.nodes[i]],camera,parent);
-    //shader.end();
+        renderNode(model,model.nodes[scene.nodes[i]],camera,model.transform);
 }
