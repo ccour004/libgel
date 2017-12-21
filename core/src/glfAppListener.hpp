@@ -213,7 +213,7 @@ public:
     setRawInputProcessor(std::make_shared<MyRawInputProcessor>(&camera,&model,myCommand));
     camera = gel::camera(gel::perspective(640.0f/480.0f,45.0f,0.1f,1000.0f));
     camera.setTranslate(glm::vec3(0,0,-500/*-10*/));
-    fillWithJSON(model,"assets/scene.gltf");
+    fillWithJSON(model,"assets/scene.gltf"/*scene*/);
     loadModel(model,"assets/");
     return true;
 }

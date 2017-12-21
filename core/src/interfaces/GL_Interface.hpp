@@ -111,7 +111,7 @@ namespace gel{
         camera():type("perspective"){renderCamera(*this);}
         camera(gel::orthographic ortho):type("orthographic"),orthographic(ortho){renderCamera(*this);}
         camera(gel::perspective persp):type("perspective"),perspective(persp){renderCamera(*this);}
-        void setAspectRatio(float width,float height){perspective.aspectRatio = width/height;glViewport(0,0,1280,960);renderCamera(*this);}
+        void setAspectRatio(float width,float height){perspective.aspectRatio = width/height;glViewport(0,0,width,height);renderCamera(*this);}
         void setFov(float yfov){perspective.yfov = glm::radians(yfov);renderCamera(*this);}
         float getFov(){return glm::degrees(perspective.yfov);}
         void setXMag(float xmag){orthographic.xmag = xmag;renderCamera(*this);}
@@ -126,15 +126,17 @@ namespace gel{
         //Extra:
         glm::vec3 translate;
         glm::quat rotate;
-        glm::mat4 transform;
+        glm::mat4 projection,view;
     };
     void renderCamera(gel::camera& camera){
         if(camera.type == "perspective"){
             gel::perspective persp = camera.perspective;
-            camera.transform = glm::perspective(persp.yfov,persp.aspectRatio,persp.znear,persp.zfar) * glm::translate(camera.translate) * glm::mat4_cast(camera.rotate);
+            camera.projection = glm::perspective(persp.yfov,persp.aspectRatio,persp.znear,persp.zfar);
+            camera.view = glm::translate(camera.translate) * glm::mat4_cast(camera.rotate);
         }else{
             gel::orthographic ortho = camera.orthographic;
-            camera.transform = glm::ortho(-ortho.xmag,ortho.xmag,-ortho.ymag,ortho.ymag,ortho.znear,ortho.zfar) * glm::translate(camera.translate) * glm::mat4_cast(camera.rotate);
+            camera.projection = glm::ortho(-ortho.xmag,ortho.xmag,-ortho.ymag,ortho.ymag,ortho.znear,ortho.zfar);
+            camera.view = glm::translate(camera.translate) * glm::mat4_cast(camera.rotate);
         }
     }
     struct animation_sampler{
@@ -474,18 +476,26 @@ namespace gel{
         model.shaders.push_back(gel::shader("default.vert",VERTEX_SHADER));
         model.shaders.push_back(gel::shader("default.frag",FRAGMENT_SHADER));
         model.programs.push_back(gel::program(model.shaders.size()-2,model.shaders.size()-1,std::vector<std::string>{
-            "a_position","a_texcoord0"
+            "a_position","a_texcoord0","a_normal"
         }));
         std::map<std::string,std::string> attributes,uniforms;
         std::map<std::string,gel::technique_parameters> parameters;
         attributes["a_position"] = "position";
         attributes["a_texcoord0"] = "texcoord0";
+        attributes["a_normal"] = "normal";
         parameters["projectionMatrix"] = gel::technique_parameters("PROJECTION",35676);
+        parameters["modelViewMatrix"] = gel::technique_parameters("MODELVIEW",35676);
+        parameters["normalMatrix"] = gel::technique_parameters("MODELVIEWINVERSETRANSPOSE",35675);
         parameters["position"] = gel::technique_parameters("POSITION",35665);
         parameters["texcoord0"] = gel::technique_parameters("TEXCOORD_0",35665);
+        parameters["normal"] = gel::technique_parameters("NORMAL",35665);
         parameters["diffuse"] = gel::technique_parameters(35666);
-        uniforms["u_projView"] = "projectionMatrix";
+        parameters["light_dir"] = gel::technique_parameters(35665);
+        uniforms["u_projectionMatrix"] = "projectionMatrix";
+        uniforms["u_modelViewMatrix"] = "modelViewMatrix";
+        uniforms["u_normalMatrix"] = "normalMatrix";
         uniforms["u_diffuse"] = "diffuse";
+        uniforms["u_light_dir"] = "light_dir";
         //TODO: fill out for default technique
         model.techniques.push_back(gel::technique(attributes,uniforms,parameters,0));
     }
@@ -619,8 +629,9 @@ void loadPrimitive(gel::primitive& primitive,const std::vector<gel::bufferView>&
                 loadAccessor(accessor,view,parameter.second.parameterReference);
                 if(parameter.second.semantic == "POSITION"){
                     SDL_Log("POSITION [%i]",attribute.second);
-                    printAccessor(accessor,model);
-                }
+                    //printAccessor(accessor,model);
+                }else if(parameter.second.semantic == "NORMAL")
+                    SDL_Log("NORMAL [%i]",attribute.second);
                 break;
             }
         }
@@ -630,7 +641,7 @@ void loadPrimitive(gel::primitive& primitive,const std::vector<gel::bufferView>&
     if(primitive.indices != -1){
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,bufferViews[accessors[primitive.indices].bufferView].bufferReference);
         SDL_Log("INDICES [%i]",primitive.indices);
-        printAccessor(accessors[primitive.indices],model);
+        //printAccessor(accessors[primitive.indices],model);
     }
 }
 
@@ -889,17 +900,23 @@ void renderTexture(gel::material material,gel::model& model){
     //TODO: fill this out a lot more with various textures, factors, etc. for both metallicRoughness and specularGlossiness
 }
 
-void renderMesh(gel::mesh& mesh,glm::mat4 transform,gel::model& model){
+void renderMesh(gel::mesh& mesh,gel::camera& camera,glm::mat4& transform,gel::model& model){
     //SDL_Log(">>>RENDER MESH");
+    std::vector<float> lightDir = std::vector<float>{1.0f,0.0f,0.0f};
+    glm::mat4 modelView = camera.view * transform;
+    glm::mat3 inverseTranspose = glm::mat3(glm::inverse(glm::transpose(modelView)));
     if(mesh.isVisible)
     for(gel::primitive primitive:mesh.primitives){
         renderTechnique(model.techniques[model.materials[primitive.material].technique],model,
             std::map<std::string,void*>{
-                {"u_projView",glm::value_ptr(transform)},
+                {"u_projectionMatrix",glm::value_ptr(camera.projection)},
+                {"u_modelViewMatrix",glm::value_ptr(modelView)},
+                {"u_normalMatrix",glm::value_ptr(inverseTranspose)},
                 {"u_diffuse",
                 model.materials[primitive.material].pbrMetallicRoughness.metallicFactor !=-1.0f?
                 model.materials[primitive.material].pbrMetallicRoughness.baseColorFactor.data():
-                model.materials[primitive.material].pbrSpecularGlossiness.diffuseFactor.data()}
+                model.materials[primitive.material].pbrSpecularGlossiness.diffuseFactor.data()},
+                {"u_light_dir",lightDir.data()}
             });
         renderTexture(model.materials[primitive.material],model);
         glBindVertexArray(primitive.bufferReference);
@@ -950,7 +967,7 @@ void renderNode(gel::model& model,gel::node& node,gel::camera& camera,glm::mat4 
         * glm::mat4_cast(glm::quat(node.rotation[3],node.rotation[0],node.rotation[1],node.rotation[2])) 
         * glm::scale(node.scale);
     if(node.mesh != -1){
-        renderMesh(model.meshes[node.mesh],camera.transform * parent,model);
+        renderMesh(model.meshes[node.mesh],camera,parent,model);
         // printAccessor(model.accessors[model.meshes[node.mesh].primitives[0].attributes["POSITION"]],model);
     }
     //Render all child nodes, if any.

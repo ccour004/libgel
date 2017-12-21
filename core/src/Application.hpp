@@ -97,18 +97,18 @@ namespace gel
             //Build window and context.
             SDL_Log("++BUILD SDL WINDOW AND SDL/GL CONTEXT++");
             int params = SDL_WINDOW_OPENGL;
-            //#ifdef DESKTOP
+            #ifdef DESKTOP
                 if(desktop->resizable) params |= SDL_WINDOW_RESIZABLE;
                 if(desktop->fullscreen) params |= SDL_WINDOW_FULLSCREEN;
                 window = SDL_CreateWindow(desktop->title.c_str(),
                     desktop->x > -1 ? desktop->x : SDL_WINDOWPOS_UNDEFINED,
                     desktop->y > -1 ? desktop->y : SDL_WINDOWPOS_UNDEFINED,
                     desktop->width,desktop->height,params);
-            /*#else
+            #else
                 window = SDL_CreateWindow("",
                     SDL_WINDOWPOS_UNDEFINED,SDL_WINDOWPOS_UNDEFINED,
                     640,480,params);        
-            #endif*/
+            #endif
             if (window == NULL){
                 SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,"Could not create window: %s", SDL_GetError());
                 return false;
